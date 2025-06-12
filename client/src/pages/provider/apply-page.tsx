@@ -1,8 +1,7 @@
 import { useEffect } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-import { useQuery } from "@tanstack/react-query";
-import { Loader2, CheckCircle, Clock, XCircle, FileText } from "lucide-react";
+import { Loader2, CheckCircle, Clock, XCircle, FileText, AlertTriangle, Home } from "lucide-react";
 import Header from "@/components/layout/header";
 import Footer from "@/components/layout/footer";
 import MobileNav from "@/components/layout/mobile-nav";
@@ -10,88 +9,14 @@ import ProviderApplicationForm from "@/components/providers/provider-application
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-
-interface HostApplication {
-  id: number;
-  user_id: number;
-  phone: string;
-  address: string;
-  bio?: string;
-  status: "pending" | "approved" | "rejected";
-  created_at: string;
-  reviewed_at?: string;
-  admin_comment?: string;
-  verification_documents?: string;
-}
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient } from "@/lib/queryClient";
 
 export default function ProviderApplyPage() {
   const { user, isLoading: isLoadingUser } = useAuth();
   const [_, navigate] = useLocation();
-  
-  // Check if user has an existing application
-  const { data: application, isLoading: isLoadingApplication, refetch } = useQuery<HostApplication | null>({
-    queryKey: [`/api/v1/users/application-status`, user?.id], // Include user ID in query key
-    enabled: !!user && !isLoadingUser, // Wait for user to be fully loaded
-    retry: 1, // Retry once on failure
-    retryDelay: 1000, // Wait 1 second before retry
-    staleTime: 0, // Always fetch fresh data
-    gcTime: 0, // Don't cache
-    // Return null if no application found
-    queryFn: async () => {
-      console.log('APPLICATION STATUS QUERY: Starting query for user:', user?.email);
-      
-      try {
-        // Wait a moment for auth to stabilize
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        // Get current session token
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        
-        if (sessionError) {
-          console.error('APPLICATION STATUS QUERY: Session error:', sessionError);
-          throw new Error(`Session error: ${sessionError.message}`);
-        }
-        
-        if (!session) {
-          console.error('APPLICATION STATUS QUERY: No active session found');
-          throw new Error("No active session found");
-        }
-        
-        console.log('APPLICATION STATUS QUERY: Making API request with token');
-        
-        const response = await fetch('/api/v1/users/application-status', {
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json',
-          },
-        });
-        
-        console.log('APPLICATION STATUS QUERY: Response status:', response.status);
-        
-        if (response.status === 404) {
-          console.log('APPLICATION STATUS QUERY: No application found (404)');
-          return null;
-        }
-        
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error('APPLICATION STATUS QUERY: Request failed:', response.status, errorText);
-          throw new Error(`Failed to fetch application status: ${response.status} ${errorText}`);
-        }
-        
-        const data = await response.json();
-        console.log('APPLICATION STATUS QUERY: Success! Data:', data);
-        return data;
-        
-      } catch (error) {
-        console.error('APPLICATION STATUS QUERY: Error:', error);
-        // Return null on error instead of throwing, so the form is shown
-        return null;
-      }
-    }
-  });
-  
-  const isLoading = isLoadingUser || isLoadingApplication;
+  const { toast } = useToast();
   
   useEffect(() => {
     // Redirect if not logged in
@@ -100,12 +25,13 @@ export default function ProviderApplyPage() {
     }
     
     // Redirect if already a provider (approved application)
-    if (!isLoading && user?.role === "provider") {
+    if (!isLoadingUser && user?.role === "provider") {
       navigate("/provider/dashboard");
     }
-  }, [user, isLoading, navigate]);
+  }, [user, isLoadingUser, navigate]);
   
-  if (isLoading) {
+  // Show loading while checking auth
+  if (isLoadingUser) {
     return (
       <div className="flex flex-col min-h-screen">
         <Header />
@@ -122,25 +48,27 @@ export default function ProviderApplyPage() {
     return null; // Will redirect via useEffect
   }
   
-  // If user already has an application, show status instead of form
-  if (application) {
-    return (
-      <div className="flex flex-col min-h-screen">
-        <Header />
-        
-        <main className="container mx-auto px-4 py-8 flex-grow">
-          <div className="max-w-4xl mx-auto">
-            <ApplicationStatusCard application={application} onRefresh={refetch} />
-          </div>
-        </main>
-        
-        <Footer />
-        <MobileNav />
-      </div>
-    );
-  }
+  // INSTANT STATUS CHECK: Use data already in user object
+  const applicationStatus = (user.hostApplicationStatus || user.host_application_status)?.toLowerCase();
+  
+  console.log("APPLY PAGE DEBUG: User host status:", applicationStatus);
+  console.log("APPLY PAGE DEBUG: User role:", user.role);
+  
+  // Handle successful application submission
+  const handleApplicationSuccess = () => {
+    toast({
+      title: "Application submitted!",
+      description: "We'll review your application and get back to you soon.",
+    });
+    
+    // Refresh user data to get updated status
+    queryClient.invalidateQueries({ queryKey: ["/api/v1/users/me"] });
+  };
 
-  // Show application form if no existing application
+  // DECISION LOGIC: What to show based on status
+  const shouldShowForm = !applicationStatus || applicationStatus === "rejected";
+  const shouldShowStatus = applicationStatus === "pending" || applicationStatus === "approved";
+
   return (
     <div className="flex flex-col min-h-screen">
       <Header />
@@ -151,43 +79,113 @@ export default function ProviderApplyPage() {
             <h1 className="text-3xl font-bold mb-2">Become a HuntStay Host</h1>
             <p className="text-gray-600 max-w-2xl mx-auto">
               Share your hunting property with hunters around the world and earn extra income.
-              Complete the application below to get started.
+              {shouldShowForm ? " Complete the application below to get started." : ""}
             </p>
           </div>
           
+          {/* Show Process Steps */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
             <div className="text-center">
-              <div className="rounded-full bg-primary/10 w-16 h-16 flex items-center justify-center mx-auto mb-4">
-                <FileText className="text-primary text-xl h-6 w-6" />
+              <div className="rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4 bg-green-100">
+                <FileText className="text-xl h-6 w-6 text-green-600" />
               </div>
               <h2 className="text-lg font-semibold mb-2">1. Apply</h2>
               <p className="text-gray-600">
                 Fill out your information and submit required documents for verification
               </p>
+              {applicationStatus && (
+                <div className="mt-2">
+                  <Badge variant="outline" className="text-xs">
+                    {applicationStatus === "pending" ? "✓ Completed" : 
+                     applicationStatus === "approved" ? "✓ Completed" : 
+                     applicationStatus === "rejected" ? "❌ Rejected" : ""}
+                  </Badge>
+                </div>
+              )}
             </div>
             
             <div className="text-center">
-              <div className="rounded-full bg-gray-100 w-16 h-16 flex items-center justify-center mx-auto mb-4">
-                <Clock className="text-gray-400 text-xl h-6 w-6" />
+              <div className={`rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4 ${
+                applicationStatus === "pending" || applicationStatus === "approved" ? 'bg-green-100' : 'bg-gray-100'
+              }`}>
+                <Clock className={`text-xl h-6 w-6 ${
+                  applicationStatus === "pending" || applicationStatus === "approved" ? 'text-green-600' : 'text-gray-400'
+                }`} />
               </div>
               <h2 className="text-lg font-semibold mb-2">2. Get Approved</h2>
               <p className="text-gray-600">
                 We'll review your application and verify your documents
               </p>
+              {applicationStatus === "pending" && (
+                <div className="mt-2">
+                  <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
+                    🔄 In Review
+                  </Badge>
+                </div>
+              )}
+              {applicationStatus === "approved" && (
+                <div className="mt-2">
+                  <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
+                    ✅ Approved
+                  </Badge>
+                </div>
+              )}
+              {applicationStatus === "rejected" && (
+                <div className="mt-2">
+                  <Badge variant="secondary" className="bg-red-100 text-red-800 text-xs">
+                    ❌ Rejected
+                  </Badge>
+                </div>
+              )}
             </div>
             
             <div className="text-center">
-              <div className="rounded-full bg-gray-100 w-16 h-16 flex items-center justify-center mx-auto mb-4">
-                <CheckCircle className="text-gray-400 text-xl h-6 w-6" />
+              <div className={`rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4 ${
+                applicationStatus === "approved" ? 'bg-green-100' : 'bg-gray-100'
+              }`}>
+                <CheckCircle className={`text-xl h-6 w-6 ${
+                  applicationStatus === "approved" ? 'text-green-600' : 'text-gray-400'
+                }`} />
               </div>
               <h2 className="text-lg font-semibold mb-2">3. Start Hosting</h2>
               <p className="text-gray-600">
                 Create listings for your properties and welcome hunters
               </p>
+              {applicationStatus === "approved" && (
+                <div className="mt-2">
+                  <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
+                    🎉 Ready to Host
+                  </Badge>
+                </div>
+              )}
             </div>
           </div>
           
-          <ProviderApplicationForm onSuccess={refetch} />
+          {/* CONDITIONAL RENDERING: Show form OR status based on application state */}
+          {shouldShowStatus && (
+            <ApplicationStatusCard 
+              status={applicationStatus} 
+              onRefresh={() => {
+                queryClient.invalidateQueries({ queryKey: ["/api/v1/users/me"] });
+              }}
+            />
+          )}
+          
+          {shouldShowForm && (
+            <>
+              {applicationStatus === "rejected" && (
+                <Alert className="mb-6 border-red-200 bg-red-50">
+                  <AlertTriangle className="h-4 w-4 text-red-600" />
+                  <AlertDescription className="text-red-800">
+                    Your previous application was not approved. You can submit a new application below. 
+                    Please review our requirements and ensure all information is accurate.
+                  </AlertDescription>
+                </Alert>
+              )}
+              
+              <ProviderApplicationForm onSuccess={handleApplicationSuccess} />
+            </>
+          )}
         </div>
       </main>
       
@@ -198,7 +196,13 @@ export default function ProviderApplyPage() {
 }
 
 // Component to show application status
-function ApplicationStatusCard({ application, onRefresh }: { application: HostApplication, onRefresh: () => void }) {
+function ApplicationStatusCard({ 
+  status, 
+  onRefresh 
+}: { 
+  status: string;
+  onRefresh: () => void;
+}) {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "pending":
@@ -215,11 +219,11 @@ function ApplicationStatusCard({ application, onRefresh }: { application: HostAp
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "pending":
-        return <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">Pending Review</Badge>;
+        return <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">Under Review</Badge>;
       case "approved":
         return <Badge variant="secondary" className="bg-green-100 text-green-800">Approved</Badge>;
       case "rejected":
-        return <Badge variant="secondary" className="bg-red-100 text-red-800">Rejected</Badge>;
+        return <Badge variant="secondary" className="bg-red-100 text-red-800">Not Approved</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
@@ -228,88 +232,73 @@ function ApplicationStatusCard({ application, onRefresh }: { application: HostAp
   const getStatusMessage = (status: string) => {
     switch (status) {
       case "pending":
-        return "Your application is currently under review. We'll notify you once it's been processed.";
+        return "Your application is currently under review. We'll notify you once it's been processed. This typically takes 2-3 business days.";
       case "approved":
-        return "Congratulations! Your application has been approved. You can now start hosting on HuntStay.";
+        return "Congratulations! Your application has been approved. You can now start hosting on HuntStay and create property listings.";
       case "rejected":
-        return "Unfortunately, your application was not approved. Please see the admin comment below for more details.";
+        return "Unfortunately, your application was not approved at this time. Please contact our support team for more details and guidance on reapplying.";
       default:
         return "Your application status is being updated.";
     }
   };
 
   return (
-    <div className="text-center mb-8">
-      <h1 className="text-3xl font-bold mb-8">Your Host Application</h1>
+    <Card className="max-w-2xl mx-auto">
+      <CardHeader className="text-center">
+        <div className="flex justify-center mb-4">
+          {getStatusIcon(status)}
+        </div>
+        <CardTitle className="text-2xl mb-2">Application Status</CardTitle>
+        {getStatusBadge(status)}
+      </CardHeader>
       
-      <Card className="max-w-2xl mx-auto">
-        <CardHeader className="text-center">
-          <div className="flex justify-center mb-4">
-            {getStatusIcon(application.status)}
-          </div>
-          <CardTitle className="text-2xl mb-2">Application Status</CardTitle>
-          {getStatusBadge(application.status)}
-        </CardHeader>
+      <CardContent className="space-y-6">
+        <p className="text-gray-600 text-center">
+          {getStatusMessage(status)}
+        </p>
         
-        <CardContent className="space-y-6">
-          <p className="text-gray-600">
-            {getStatusMessage(application.status)}
-          </p>
+        {status === "pending" && (
+          <Alert className="border-yellow-200 bg-yellow-50">
+            <Clock className="h-4 w-4 text-yellow-600" />
+            <AlertDescription className="text-yellow-800">
+              <strong>What happens next?</strong><br />
+              Our team is reviewing your documents and information. You'll receive an email notification 
+              once the review is complete. Please ensure your email notifications are enabled.
+            </AlertDescription>
+          </Alert>
+        )}
+        
+        {status === "approved" && (
+          <Alert className="border-green-200 bg-green-50">
+            <CheckCircle className="h-4 w-4 text-green-600" />
+            <AlertDescription className="text-green-800">
+              <strong>Welcome to HuntStay!</strong><br />
+              You're now part of our host community. You can start creating property listings 
+              and welcoming hunters to your property.
+            </AlertDescription>
+          </Alert>
+        )}
+        
+        <div className="flex justify-center space-x-4 pt-4">
+          <Button variant="outline" onClick={onRefresh}>
+            <Clock className="h-4 w-4 mr-2" />
+            Refresh Status
+          </Button>
           
-          <div className="space-y-4 text-left">
-            <div>
-              <label className="font-medium text-gray-700">Application ID:</label>
-              <p className="text-gray-900">#{application.id}</p>
-            </div>
-            
-            <div>
-              <label className="font-medium text-gray-700">Submitted On:</label>
-              <p className="text-gray-900">
-                {new Date(application.created_at).toLocaleDateString('en-US', {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric'
-                })}
-              </p>
-            </div>
-            
-            {application.reviewed_at && (
-              <div>
-                <label className="font-medium text-gray-700">Reviewed On:</label>
-                <p className="text-gray-900">
-                  {new Date(application.reviewed_at).toLocaleDateString('en-US', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric'
-                  })}
-                </p>
-              </div>
-            )}
-            
-            {application.admin_comment && (
-              <div>
-                <label className="font-medium text-gray-700">Admin Comment:</label>
-                <p className="text-gray-900 bg-gray-50 p-3 rounded-md">
-                  {application.admin_comment}
-                </p>
-              </div>
-            )}
-          </div>
-          
-          <div className="flex justify-center space-x-4 pt-4">
-            <Button variant="outline" onClick={onRefresh}>
-              <Clock className="h-4 w-4 mr-2" />
-              Refresh Status
+          {status === "approved" && (
+            <Button onClick={() => window.location.href = "/provider/dashboard"}>
+              <Home className="h-4 w-4 mr-2" />
+              Go to Dashboard
             </Button>
-            
-            {application.status === "approved" && (
-              <Button onClick={() => window.location.href = "/provider/dashboard"}>
-                Go to Dashboard
-              </Button>
+          )}
+          
+          {status === "rejected" && (
+            <Button variant="outline" onClick={() => window.location.href = "/contact"}>
+              Contact Support
+            </Button>
             )}
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

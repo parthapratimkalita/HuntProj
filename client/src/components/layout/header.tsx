@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
+import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -18,7 +19,8 @@ import {
 
 export default function Header() {
   const [location] = useLocation();
-  const { user, logout, logoutMutation } = useAuth(); // Added logout import
+  const { user, logout } = useAuth();
+  const { toast } = useToast();
   const [searchLocation, setSearchLocation] = useState("");
   const [_, navigate] = useLocation();
   
@@ -35,6 +37,55 @@ export default function Header() {
     } catch (error) {
       console.error('HEADER: Logout failed:', error);
       alert("Logout failed: " + (error instanceof Error ? error.message : "Unknown error"));
+    }
+  };
+
+  // OPTIMIZED: No more slow API calls! 🚀
+  const handleBecomeHostClick = () => {
+    if (!user) {
+      navigate("/auth");
+      return;
+    }
+
+    // INSTANT STATUS CHECK: Use data already in user object
+    const hostStatus = user.hostApplicationStatus || user.host_application_status;
+
+    console.log("HEADER: Instant status check - hostApplicationStatus:", hostStatus);
+
+    if (hostStatus) {
+      // User already has an application - show status message
+      let statusMessage = "";
+      let toastVariant: "default" | "destructive" = "default";
+      
+      switch (hostStatus) {
+        case "pending":
+          statusMessage = "Your host application is currently under review. Documents are being processed.";
+          break;
+        case "approved":
+          statusMessage = "Your host application has been approved! You can now manage your properties.";
+          // Navigate to provider dashboard since they're approved
+          navigate("/provider/dashboard");
+          return;
+        case "rejected":
+          statusMessage = "Your previous host application was rejected. Please contact support for more information.";
+          toastVariant = "destructive";
+          break;
+        default:
+          statusMessage = `Your host application status is: ${hostStatus}`;
+      }
+
+      toast({
+        title: "Application Status",
+        description: statusMessage,
+        variant: toastVariant,
+      });
+
+      // For pending/rejected, still navigate to apply page to show status
+      navigate("/provider/apply");
+    } else {
+      // No existing application - proceed to apply page
+      console.log("HEADER: No application found, proceeding to apply page");
+      navigate("/provider/apply");
     }
   };
   
@@ -139,11 +190,13 @@ export default function Header() {
               </Button>
             </Link>
           ) : user?.role !== "admin" && (
-            <Link href="/provider/apply">
-              <Button variant="ghost" className="hidden md:flex">
-                Become a host
-              </Button>
-            </Link>
+            <Button 
+              variant="ghost" 
+              className="hidden md:flex"
+              onClick={handleBecomeHostClick}
+            >
+              Become a host
+            </Button>
           )}
           
           <div className="ml-4 relative">
@@ -223,12 +276,13 @@ export default function Header() {
                       )}
                       
                       {user.role === "user" && (
-                        <Link href="/provider/apply">
-                          <DropdownMenuItem className="cursor-pointer">
-                            <Home className="mr-2 h-4 w-4" />
-                            <span>Become a Host</span>
-                          </DropdownMenuItem>
-                        </Link>
+                        <DropdownMenuItem 
+                          className="cursor-pointer"
+                          onClick={handleBecomeHostClick}
+                        >
+                          <Home className="mr-2 h-4 w-4" />
+                          <span>Become a Host</span>
+                        </DropdownMenuItem>
                       )}
                       
                       <DropdownMenuSeparator />

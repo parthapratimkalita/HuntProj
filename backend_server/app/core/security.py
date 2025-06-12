@@ -14,6 +14,7 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"/api/v1/auth/login")
 
 def create_access_token(subject: Union[str, Any], expires_delta: timedelta = None) -> str:
+    """Create JWT access token"""
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
     else:
@@ -25,19 +26,21 @@ def create_access_token(subject: Union[str, Any], expires_delta: timedelta = Non
     return encoded_jwt
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Verify password against hash"""
     return pwd_context.verify(plain_password, hashed_password)
 
 def get_password_hash(password: str) -> str:
+    """Generate password hash"""
     return pwd_context.hash(password)
 
 def verify_token(token: str) -> dict:
+    """Verify JWT token"""
     try:
         decoded_token = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         return decoded_token
     except jwt.JWTError:
         return None
 
-# New function to get Supabase user info without requiring database user
 async def get_supabase_user(token: str = Depends(oauth2_scheme)):
     """
     Get Supabase user info from token without requiring database user to exist
@@ -106,7 +109,6 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-# Optional: Function that gets current user but allows for missing database user
 async def get_current_user_optional(
     db: Session = Depends(get_db),
     token: str = Depends(oauth2_scheme)
