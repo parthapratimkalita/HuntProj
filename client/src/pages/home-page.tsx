@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Property, Wishlist } from "@shared/schema";
 import Header from "@/components/layout/header";
@@ -29,6 +29,35 @@ export default function HomePage() {
     season: "",
     huntingType: [],
   });
+
+  // Sticky search bar state
+  const [isSticky, setIsSticky] = useState(false);
+  const searchBarRef = useRef<HTMLDivElement>(null);
+  const [searchBarTop, setSearchBarTop] = useState(0);
+
+  // Sticky search bar effect
+  useEffect(() => {
+    // Get the initial position of the search bar
+    if (searchBarRef.current) {
+      const rect = searchBarRef.current.getBoundingClientRect();
+      setSearchBarTop(rect.top + window.scrollY);
+    }
+
+    const handleScroll = () => {
+      const scrollTop = window.scrollY;
+      const headerHeight = 80; // Adjust based on your header height
+      
+      // Check if search bar should stick
+      if (scrollTop >= (searchBarTop - headerHeight)) {
+        setIsSticky(true);
+      } else {
+        setIsSticky(false);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [searchBarTop]);
   
   // Fetch only approved properties from API for all users
   const { data: properties, isLoading, error } = useQuery<Property[]>({
@@ -111,7 +140,7 @@ export default function HomePage() {
 
   return (
     <div className="flex flex-col min-h-screen">
-      {/* Wild Connect Header - Use the original Header while we implement the change */}
+      {/* Wild Connect Header */}
       <Header />
       
       {/* Hero Section */}
@@ -144,10 +173,19 @@ export default function HomePage() {
             </div>
           </div>
         </div>
+      </div>
         
-        {/* Search Bar */}
-        <div className="relative mx-auto max-w-5xl px-4 -mt-8 md:-mt-16 z-30">
-          <div className="bg-white rounded-lg shadow-lg p-4 mt-4 md:mt-0">
+      {/* Sticky Search Bar */}
+      <div 
+        ref={searchBarRef}
+        className={`${
+          isSticky 
+            ? 'fixed top-20 left-0 right-0 z-30' 
+            : 'relative'
+        } transition-all duration-300`}
+      >
+        <div className="mx-auto max-w-5xl px-4 py-4">
+          <div className="bg-white rounded-lg shadow-lg p-4 border border-gray-200">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
               <div className="border rounded-lg p-3">
                 <div className="text-xs text-gray-500">Destination</div>
@@ -182,6 +220,9 @@ export default function HomePage() {
           </div>
         </div>
       </div>
+
+      {/* Spacer when search bar becomes sticky */}
+      {isSticky && <div className="h-24"></div>}
       
       {/* Game Type Categories */}
       <div className="bg-white pt-8 pb-6">
