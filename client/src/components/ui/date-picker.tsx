@@ -48,19 +48,9 @@ export function DateRangePicker({
     }
   }, [currentMonth]);
 
-  // Lock scroll when popup is open
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = 'unset';
-    }
-    
-    // Cleanup function to restore scroll on unmount
-    return () => {
-      document.body.style.overflow = 'unset';
-    };
-  }, [isOpen]);
+  // REMOVED: The problematic scroll lock that was causing the page jump
+  // The Popover component handles backdrop clicks and escape key naturally
+  // No need to lock body scroll for a date picker
 
   const nextMonth = new Date(currentMonth);
   nextMonth.setMonth(nextMonth.getMonth() + 1);
@@ -72,28 +62,13 @@ export function DateRangePicker({
     }
   };
 
-  const handleQuickAdjust = (days: number) => {
-    if (!date?.from || !date?.to) {
-      // If no dates selected, start from today
-      const today = new Date();
-      const endDate = addDays(today, days);
-      const range: DateRange = {
-        from: today,
-        to: endDate
-      };
-      setDate(range);
-      onSelect?.(range);
-    } else {
-      // Adjust existing date range, but ensure start date is not in the past
-      const today = new Date();
-      const startDate = date.from < today ? today : date.from;
-      const newEndDate = addDays(date.to, days);
-      const range: DateRange = {
-        from: startDate,
-        to: newEndDate
-      };
-      setDate(range);
-      onSelect?.(range);
+  const [flexibilityOption, setFlexibilityOption] = useState<string>('exact');
+
+  const handleFlexibilitySelect = (option: string) => {
+    setFlexibilityOption(option);
+    // Don't change the actual dates - just store the flexibility preference
+    if (date?.from && date?.to) {
+      onSelect?.(date); // Keep the same dates but user has chosen flexibility
     }
   };
 
@@ -215,6 +190,8 @@ export function DateRangePicker({
         sideOffset={8}
         avoidCollisions={false}
         sticky="always"
+        // Prevent auto-focus to avoid scrollbar jump
+        onOpenAutoFocus={(e) => e.preventDefault()}
       >
         <div className={`bg-white rounded-lg ${isMobile ? 'w-[350px]' : 'w-[700px]'}`}>
           {/* Tab Navigation */}
@@ -307,6 +284,9 @@ export function DateRangePicker({
               className="border-0 text-sm"
               showOutsideDays={false}
               disabled={{ before: new Date() }}
+              modifiers={{
+                today: () => false, // Disable today highlighting
+              }}
               components={{
                 IconLeft: () => null,
                 IconRight: () => null,
@@ -315,49 +295,83 @@ export function DateRangePicker({
             />
           </div>
 
-          {/* Quick Date Adjustment Buttons */}
-          <div className="flex flex-wrap gap-2 mb-4 justify-center">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleQuickAdjust(1)}
-              className="text-xs px-3 py-1 h-8 border-gray-300"
-            >
-              ± 1 day
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleQuickAdjust(2)}
-              className="text-xs px-3 py-1 h-8 border-gray-300"
-            >
-              ± 2 days
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleQuickAdjust(3)}
-              className="text-xs px-3 py-1 h-8 border-gray-300"
-            >
-              ± 3 days
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleQuickAdjust(7)}
-              className="text-xs px-3 py-1 h-8 border-gray-300"
-            >
-              ± 7 days
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleQuickAdjust(14)}
-              className="text-xs px-3 py-1 h-8 border-gray-300"
-            >
-              ± 14 days
-            </Button>
-          </div>
+          {/* Exact dates and Date Flexibility Options - Airbnb Style */}
+          {date?.from && date?.to && (
+            <div className="flex flex-wrap gap-2 mb-4 justify-center">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleFlexibilitySelect('exact')}
+                className={`text-xs px-3 py-1 h-8 border-gray-300 ${
+                  flexibilityOption === 'exact' 
+                    ? 'bg-black text-white border-black' 
+                    : 'bg-white text-gray-700'
+                }`}
+              >
+                Exact dates
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleFlexibilitySelect('1day')}
+                className={`text-xs px-3 py-1 h-8 border-gray-300 ${
+                  flexibilityOption === '1day' 
+                    ? 'bg-black text-white border-black' 
+                    : 'bg-white text-gray-700'
+                }`}
+              >
+                ± 1 day
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleFlexibilitySelect('2days')}
+                className={`text-xs px-3 py-1 h-8 border-gray-300 ${
+                  flexibilityOption === '2days' 
+                    ? 'bg-black text-white border-black' 
+                    : 'bg-white text-gray-700'
+                }`}
+              >
+                ± 2 days
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleFlexibilitySelect('3days')}
+                className={`text-xs px-3 py-1 h-8 border-gray-300 ${
+                  flexibilityOption === '3days' 
+                    ? 'bg-black text-white border-black' 
+                    : 'bg-white text-gray-700'
+                }`}
+              >
+                ± 3 days
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleFlexibilitySelect('7days')}
+                className={`text-xs px-3 py-1 h-8 border-gray-300 ${
+                  flexibilityOption === '7days' 
+                    ? 'bg-black text-white border-black' 
+                    : 'bg-white text-gray-700'
+                }`}
+              >
+                ± 7 days
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleFlexibilitySelect('14days')}
+                className={`text-xs px-3 py-1 h-8 border-gray-300 ${
+                  flexibilityOption === '14days' 
+                    ? 'bg-black text-white border-black' 
+                    : 'bg-white text-gray-700'
+                }`}
+              >
+                ± 14 days
+              </Button>
+            </div>
+          )}
           
           <ActionButtons />
         </div>
