@@ -59,12 +59,17 @@ def update_user_me(
         # Handle camelCase to snake_case conversion if needed
         if field == "fullName":
             setattr(current_user, "full_name", value)
+        elif field == "zipCode":
+            setattr(current_user, "zip_code", value)
+        elif field == "avatarUrl":
+            setattr(current_user, "avatar_url", value)
         else:
             setattr(current_user, field, value)
     
     db.add(current_user)
     db.commit()
     db.refresh(current_user)
+    print(f"UPDATE USER DEBUG: User updated successfully. Avatar URL: {current_user.avatar_url}")
     return current_user
 
 @router.patch("/me", response_model=UserSchema)
@@ -75,9 +80,71 @@ def patch_user_me(
     current_user: User = Depends(get_current_user),
 ) -> Any:
     """
-    Update current user profile (PATCH version)
+    Update current user profile (PATCH version) - Handles avatar_url updates
     """
-    return update_user_me(db=db, user_in=user_in, current_user=current_user)
+    print(f"PATCH USER DEBUG: Received data: {user_in.dict(exclude_unset=True)}")
+    
+    # Check for email conflicts only if email is being updated
+    if user_in.email and user_in.email != current_user.email:
+        existing_user = db.query(User).filter(User.email == user_in.email).first()
+        if existing_user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email already registered"
+            )
+    
+    # Check for username conflicts only if username is being updated
+    if user_in.username and user_in.username != current_user.username:
+        existing_user = db.query(User).filter(User.username == user_in.username).first()
+        if existing_user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Username already taken"
+            )
+    
+    # Update user fields - handle both camelCase and snake_case
+    update_data = user_in.dict(exclude_unset=True)
+    for field, value in update_data.items():
+        if field == "password" and value:
+            # Hash password if provided
+            value = get_password_hash(value)
+            setattr(current_user, field, value)
+        elif field == "fullName":
+            # Handle camelCase from frontend
+            setattr(current_user, "full_name", value)
+        elif field == "zipCode":
+            # Handle camelCase from frontend
+            setattr(current_user, "zip_code", value)
+        elif field == "avatarUrl":
+            # Handle camelCase from frontend
+            setattr(current_user, "avatar_url", value)
+            print(f"PATCH USER DEBUG: Setting avatar_url to: {value}")
+        elif field in ["full_name", "zip_code", "avatar_url"]:
+            # Handle snake_case directly
+            setattr(current_user, field, value)
+            if field == "avatar_url":
+                print(f"PATCH USER DEBUG: Setting avatar_url (snake_case) to: {value}")
+        else:
+            # Handle other fields directly
+            setattr(current_user, field, value)
+    
+    # Special handling for avatar_url removal (when set to null/None)
+    if "avatar_url" in update_data and update_data["avatar_url"] is None:
+        current_user.avatar_url = None
+        print(f"PATCH USER DEBUG: Avatar URL removed (set to None)")
+    elif "avatarUrl" in update_data and update_data["avatarUrl"] is None:
+        current_user.avatar_url = None
+        print(f"PATCH USER DEBUG: Avatar URL removed via camelCase (set to None)")
+    
+    # Update the updated_at timestamp
+    current_user.updated_at = func.now()
+    
+    db.add(current_user)
+    db.commit()
+    db.refresh(current_user)
+    
+    print(f"PATCH USER DEBUG: User updated successfully. Final avatar_url: {current_user.avatar_url}")
+    return current_user
 
 @router.post("/apply-host", response_model=HostApplicationSchema)
 async def apply_for_host(
@@ -120,7 +187,6 @@ async def apply_for_host(
         
         # UPDATE USER TABLE: Set the status and ID
         current_user.host_application_status = "pending"
-        current_user.host_application_id = application.id
         db.commit()
         db.refresh(current_user)
         
@@ -244,7 +310,15 @@ async def sync_profile(
             role="user",
             # Host application status defaults to NULL (no application yet)
             host_application_status=None,
-            host_application_id=None
+            # Initialize other profile fields as None
+            phone=None,
+            address=None,
+            city=None,
+            state=None,
+            zip_code=None,
+            country=None,
+            bio=None,
+            avatar_url=None,  # Initialize avatar URL as None
         )
         
         db.add(user)

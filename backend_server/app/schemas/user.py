@@ -35,7 +35,7 @@ class UserUpdate(BaseModel):
     zip_code: Optional[str] = None
     country: Optional[str] = None
     bio: Optional[str] = None
-    avatar_url: Optional[str] = None
+    avatar_url: Optional[str] = None  # Added avatar_url support
     password: Optional[str] = None
 
 # For host applications - validate required fields

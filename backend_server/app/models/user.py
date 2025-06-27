@@ -16,21 +16,22 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
-    # SIMPLE: Only the status column (no foreign key!)
+    # Profile fields
+    phone = Column(String, nullable=True)
+    address = Column(String, nullable=True)
+    city = Column(String, nullable=True)
+    state = Column(String, nullable=True)
+    zip_code = Column(String, nullable=True)
+    country = Column(String, nullable=True)
+    bio = Column(String, nullable=True)
+    avatar_url = Column(String, nullable=True)
+    
+    # Host application status
     host_application_status = Column(String, nullable=True)  # "pending", "approved", "rejected"
 
-    # CLEAN RELATIONSHIPS: No circular dependencies
-    properties = relationship("Property", back_populates="owner")
-    bookings = relationship("Booking", back_populates="user")
+    # Relationships
+    properties = relationship("Property", back_populates="provider", cascade="all, delete-orphan")
+    bookings = relationship("Booking", back_populates="user", cascade="all, delete-orphan")
+    reviews = relationship("Review", back_populates="user", cascade="all, delete-orphan")
+    wishlists = relationship("Wishlist", back_populates="user", cascade="all, delete-orphan")
     host_applications = relationship("HostApplication", back_populates="user")
-    
-    # Helper method to get current application details if needed (rare)
-    def get_current_application(self, db_session):
-        """
-        Get the most recent application for this user
-        Only use this when you actually need application details
-        """
-        return db_session.query(HostApplication)\
-            .filter(HostApplication.user_id == self.id)\
-            .order_by(HostApplication.created_at.desc())\
-            .first()
