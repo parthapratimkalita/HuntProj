@@ -59,6 +59,40 @@ export default function HomePage() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, [searchBarTop]);
   
+
+  useEffect(() => {
+    // Test direct API call
+    const testAPI = async () => {
+      try {
+        const url = `${import.meta.env.VITE_API_BASE_URL}/api/v1/properties?approvedOnly=true`;
+        console.log('🔍 Testing direct API call to:', url);
+        
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        });
+        
+        console.log('📡 API Response Status:', response.status);
+        console.log('📡 API Response OK:', response.ok);
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log('✅ Direct API Success - Properties found:', data.length);
+          console.log('📋 Sample property:', data[0]);
+        } else {
+          const errorText = await response.text();
+          console.error('❌ Direct API Error Response:', errorText);
+        }
+      } catch (error) {
+        console.error('💥 Direct API Request Failed:', error);
+      }
+    };
+    
+    testAPI();
+  }, []);
+  
   // Fetch only approved properties from API for all users
   const { data: properties, isLoading, error } = useQuery<Property[]>({
     queryKey: ["/api/v1/properties/", { approvedOnly: true }],
