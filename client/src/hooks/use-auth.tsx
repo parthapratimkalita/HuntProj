@@ -1,4 +1,4 @@
-import { useEffect, useState, createContext, useContext, ReactNode } from 'react';
+import { useEffect, useState, createContext, useContext, ReactNode, useCallback } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useMutation, UseMutationResult } from '@tanstack/react-query';
 
@@ -10,6 +10,7 @@ interface AuthContextType {
   logoutMutation: UseMutationResult<void, Error, void, unknown>;
   loading: boolean;
   isLoading: boolean;
+  refreshUserProfile: () => Promise<any>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -80,6 +81,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw error;
     }
   };
+
+  // Function to refresh user profile externally (for profile picture updates)
+  const refreshUserProfile = useCallback(async () => {
+    try {
+      const session = await supabase.auth.getSession();
+      if (!session.data.session) {
+        console.log('AUTH DEBUG: No active session for refresh');
+        return null;
+      }
+
+      const token = session.data.session.access_token;
+      console.log('AUTH DEBUG: Refreshing user profile...');
+      
+      const response = await fetch('/api/v1/users/me', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const updatedUser = await response.json();
+        console.log('AUTH DEBUG: User profile refreshed successfully:', updatedUser);
+        
+        // Only update if avatar actually changed
+        const currentAvatarUrl = user?.avatarUrl || user?.avatar_url;
+        const newAvatarUrl = updatedUser.avatarUrl || updatedUser.avatar_url;
+        
+        if (currentAvatarUrl !== newAvatarUrl || JSON.stringify(user) !== JSON.stringify(updatedUser)) {
+          setUser(updatedUser);
+        }
+        
+        return updatedUser;
+      } else {
+        console.error('AUTH DEBUG: Failed to refresh user profile:', response.status);
+        return null;
+      }
+    } catch (error) {
+      console.error('AUTH DEBUG: Error refreshing user profile:', error);
+      return null;
+    }
+  }, []);
 
   // Function to fetch user profile from your backend
   const fetchUserProfile = async (supabaseUser: any) => {
@@ -324,7 +367,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       logout, 
       logoutMutation, 
       loading, 
-      isLoading: loading
+      isLoading: loading,
+      refreshUserProfile
     }}>
       {children}
     </AuthContext.Provider>

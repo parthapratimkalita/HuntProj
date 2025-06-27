@@ -17,7 +17,7 @@ export default function WishlistsPage() {
 
   // Fetch user's wishlist with property details
   const { data: wishlistItems, isLoading, error } = useQuery<(Wishlist & { property: Property })[]>({
-    queryKey: ["/api/v1/user/wishlists"],
+    queryKey: ["/api/v1/user/wishlists/"],
     enabled: !!user, // Only run this query if user is logged in
     queryFn: async ({ queryKey }) => {
       try {

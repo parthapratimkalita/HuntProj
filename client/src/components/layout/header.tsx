@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
@@ -11,11 +11,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { 
   User, Home, LogOut, MapPin, Heart, 
   Search, Menu, PlusCircle, BarChart3,
   Settings
 } from "lucide-react";
+import { useAvatar } from "@/hooks/useAvatar";
 
 export default function Header() {
   const [location] = useLocation();
@@ -23,6 +25,27 @@ export default function Header() {
   const { toast } = useToast();
   const [searchLocation, setSearchLocation] = useState("");
   const [_, navigate] = useLocation();
+  
+  // Use the avatar caching hook with memoized URL
+  const avatarUrl = useMemo(() => 
+    user?.avatarUrl || user?.avatar_url || undefined, 
+    [user?.avatarUrl, user?.avatar_url]
+  );
+  const { blobUrl, error: imageError } = useAvatar(avatarUrl);
+  
+  const getInitials = (name: string) => {
+    return name
+      .split(" ")
+      .map(part => part[0])
+      .join("")
+      .toUpperCase()
+      .substring(0, 2);
+  };
+  
+  const userInitials = useMemo(() => 
+    user ? getInitials(user.fullName || user.username || "U") : "",
+    [user?.fullName, user?.username]
+  );
   
   const handleLogout = async () => {
     console.log('HEADER: Logout button clicked');
@@ -204,9 +227,22 @@ export default function Header() {
               <DropdownMenuTrigger asChild>
                 <button className="flex items-center focus:outline-none border border-gray-300 rounded-full p-1 hover:shadow-md transition-shadow">
                   <Menu className="mx-2 h-5 w-5 text-gray-600" />
-                  <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center">
-                    <User className="h-5 w-5 text-gray-600" />
-                  </div>
+                  <Avatar className="h-8 w-8">
+                    {blobUrl && !imageError ? (
+                      <AvatarImage 
+                        src={blobUrl}
+                        alt={user?.fullName || user?.username || "User"}
+                        className="object-cover"
+                      />
+                    ) : null}
+                    <AvatarFallback className="bg-gray-200">
+                      {user ? (
+                        userInitials
+                      ) : (
+                        <User className="h-5 w-5 text-gray-600" />
+                      )}
+                    </AvatarFallback>
+                  </Avatar>
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
@@ -215,9 +251,18 @@ export default function Header() {
                     <DropdownMenuGroup>
                       <DropdownMenuItem className="text-sm">
                         <div className="flex items-center">
-                          <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center mr-2">
-                            <User className="h-4 w-4 text-primary" />
-                          </div>
+                          <Avatar className="h-8 w-8 mr-2">
+                            {blobUrl && !imageError ? (
+                              <AvatarImage 
+                                src={blobUrl}
+                                alt={user.fullName || user.username}
+                                className="object-cover"
+                              />
+                            ) : null}
+                            <AvatarFallback className="bg-primary/10">
+                              {userInitials}
+                            </AvatarFallback>
+                          </Avatar>
                           <div>
                             <div className="font-semibold">{user.fullName || user.username}</div>
                             <div className="text-xs text-gray-500">{user.email}</div>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "wouter";
-import { Heart } from "lucide-react";
+import { Heart, MapPin, Star, Camera } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useWishlist } from "@/hooks/use-wishlist"; 
 import { useToast } from "@/hooks/use-toast";
@@ -8,22 +8,59 @@ import { cn } from "@/lib/utils";
 
 interface PropertyCardProps {
   id: number;
-  title: string;
-  location: string;
-  price: number;
-  images: string[];
+  propertyName: string;
+  location?: string;
+  city?: string;
+  state?: string;
+  huntingPackages?: Array<{
+    name: string;
+    price: number;
+    duration: number;
+    huntingType?: string;
+  }>;
+  propertyImages?: Array<{
+    url: string;
+    filename?: string;
+  }> | string[];
   rating?: number;
   inWishlist?: boolean;
   dates?: string;
   profileImageIndex?: number;
 }
 
+// Skeleton component for loading state
+function PropertyCardSkeleton() {
+  return (
+    <div className="rounded-xl overflow-hidden shadow-md bg-white animate-pulse">
+      {/* Image skeleton */}
+      <div className="relative aspect-[4/3] bg-gray-200" />
+      
+      {/* Content skeleton */}
+      <div className="p-4 space-y-2">
+        <div className="min-h-[28px]">
+          <div className="h-6 bg-gray-200 rounded w-3/4" />
+        </div>
+        <div className="min-h-[20px]">
+          <div className="h-4 bg-gray-200 rounded w-1/2" />
+        </div>
+        <div className="min-h-[20px]" />
+        <div className="min-h-[48px] pt-2 border-t">
+          <div className="h-5 bg-gray-200 rounded w-1/3" />
+          <div className="h-3 bg-gray-200 rounded w-2/3 mt-2" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function PropertyCard({
   id,
-  title,
+  propertyName,
   location,
-  price,
-  images,
+  city,
+  state,
+  huntingPackages,
+  propertyImages,
   rating,
   inWishlist = false,
   dates,
@@ -32,34 +69,45 @@ export default function PropertyCard({
   const { user } = useAuth();
   const { isInWishlist: checkWishlistStatus, addToWishlist, removeFromWishlist } = useWishlist();
   const { toast } = useToast();
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [wishlistStatus, setWishlistStatus] = useState(inWishlist);
   const [isLoading, setIsLoading] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageError, setImageError] = useState(false);
   
   // Keep the wishlist status in sync with the context
   useEffect(() => {
     setWishlistStatus(inWishlist || checkWishlistStatus(id));
   }, [id, inWishlist, checkWishlistStatus]);
   
-  // Placeholder images for development
-  const placeholderImages = [
-    "https://images.unsplash.com/photo-1499696010180-025ef6e1a8f9?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&h=400",
-    "https://images.unsplash.com/photo-1510798831971-661eb04b3739?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&h=400",
-    "https://images.unsplash.com/photo-1542718610-a1d656d1884c?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&h=400",
-    "https://images.unsplash.com/photo-1470770841072-f978cf4d019e?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&h=400"
-  ];
+  // Placeholder image for errors
+  const placeholderImage = "https://images.unsplash.com/photo-1499696010180-025ef6e1a8f9?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&h=400";
   
-  // Ensure all image paths are properly formatted with leading slash if needed
+  // Process images for new schema
+  const getImageUrls = () => {
+    if (!propertyImages || propertyImages.length === 0) {
+      return [placeholderImage];
+    }
+    
+    return propertyImages.map(img => {
+      if (typeof img === 'string') {
+        return formatImagePath(img);
+      } else if (img && typeof img === 'object' && img.url) {
+        return formatImagePath(img.url);
+      }
+      return placeholderImage;
+    });
+  };
+  
+  // Ensure all image paths are properly formatted
   const formatImagePath = (path: string) => {
-    if (!path) return '';
+    if (!path) return placeholderImage;
     if (path.startsWith('http://') || path.startsWith('https://')) return path;
     return path.startsWith('/') ? path : `/${path}`;
   };
   
-  const formattedImages = images.map(formatImagePath);
-  const displayImages = formattedImages.length > 0 ? formattedImages : placeholderImages;
+  const displayImages = getImageUrls();
   
-  // Get the profile image or default to the first image if invalid index
+  // Get the profile image
   const getProfileImage = () => {
     if (profileImageIndex !== undefined && profileImageIndex >= 0 && profileImageIndex < displayImages.length) {
       return displayImages[profileImageIndex];
@@ -67,16 +115,35 @@ export default function PropertyCard({
     return displayImages[0];
   };
   
-  const handleNext = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setCurrentImageIndex((prev) => (prev + 1) % displayImages.length);
+  // Get price from hunting packages
+  const getDisplayPrice = () => {
+    if (!huntingPackages || huntingPackages.length === 0) {
+      return 0;
+    }
+    const prices = huntingPackages.map(pkg => pkg.price || 0).filter(price => price > 0);
+    return prices.length > 0 ? Math.min(...prices) : 0;
   };
   
-  const handlePrev = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setCurrentImageIndex((prev) => (prev - 1 + displayImages.length) % displayImages.length);
+  // Get location string
+  const getLocationString = () => {
+    if (location) return location;
+    if (city && state) return `${city}, ${state}`;
+    if (city) return city;
+    if (state) return state;
+    return 'Location not specified';
+  };
+  
+  // Get primary hunting type
+  const getPrimaryHuntingType = () => {
+    if (!huntingPackages || huntingPackages.length === 0) return null;
+    const huntingType = huntingPackages[0].huntingType;
+    if (!huntingType) return null;
+    
+    // Format hunting type for display
+    return huntingType
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
   };
   
   const handleWishlist = async (e: React.MouseEvent) => {
@@ -92,25 +159,19 @@ export default function PropertyCard({
       return;
     }
     
-    if (isLoading) return; // Prevent multiple clicks
+    if (isLoading) return;
     
-    // Optimistically update UI immediately for better user experience
     const newWishlistStatus = !wishlistStatus;
     setWishlistStatus(newWishlistStatus);
     setIsLoading(true);
     
     try {
       if (!newWishlistStatus) {
-        // Use the context method to remove from wishlist (toast is handled in the hook)
         await removeFromWishlist(id);
-        // Toast removed to prevent duplication with useWishlist hook
       } else {
-        // Use the context method to add to wishlist (toast is handled in the hook)
         await addToWishlist(id);
-        // Toast removed to prevent duplication with useWishlist hook
       }
     } catch (error) {
-      // Revert optimistic update on error
       setWishlistStatus(!newWishlistStatus);
       toast({
         title: "Error",
@@ -122,58 +183,136 @@ export default function PropertyCard({
     }
   };
 
+  const displayPrice = getDisplayPrice();
+  const primaryHuntingType = getPrimaryHuntingType();
+
   return (
     <Link href={`/properties/${id}`}>
-      <div className="property-card rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-all duration-300 bg-white cursor-pointer">
-        {/* Property Images - new Instagram style gallery */}
-        <div className="relative">
-          {/* Show only the profile image in the card view */}
+      <div className="property-card group rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 bg-white cursor-pointer">
+        {/* Property Image with fixed aspect ratio to prevent CLS */}
+        <div className="relative aspect-[4/3] bg-gray-100 overflow-hidden">
+          {/* Loading skeleton */}
+          {!imageLoaded && !imageError && (
+            <div className="absolute inset-0 bg-gray-200 animate-pulse">
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Camera className="w-8 h-8 text-gray-400" />
+              </div>
+            </div>
+          )}
+          
+          {/* Main image */}
           <img 
-            src={getProfileImage()} 
-            alt={title} 
-            className="w-full h-64 object-cover"
+            src={imageError ? placeholderImage : getProfileImage()} 
+            alt={propertyName} 
+            className={`absolute inset-0 w-full h-full object-cover transition-all duration-300 ${
+              imageLoaded ? 'opacity-100 group-hover:scale-105' : 'opacity-0'
+            }`}
+            loading="lazy"
+            onLoad={() => setImageLoaded(true)}
+            onError={() => {
+              setImageError(true);
+              setImageLoaded(true);
+            }}
           />
           
-          {/* Show image count badge */}
-          {displayImages.length > 1 && (
-            <div className="absolute bottom-3 left-3 bg-black bg-opacity-60 px-2 py-1 rounded-md">
-              <span className="text-white text-xs font-medium">{displayImages.length} photos</span>
+          {/* Gradient overlay for better text visibility */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+          
+          {/* Image count badge */}
+          {displayImages.length > 1 && imageLoaded && (
+            <div className="absolute bottom-3 left-3 bg-black/70 backdrop-blur-sm px-2 py-1 rounded-md">
+              <span className="text-white text-xs font-medium flex items-center gap-1">
+                <Camera className="w-3 h-3" />
+                {displayImages.length}
+              </span>
+            </div>
+          )}
+          
+          {/* Hunting type badge */}
+          {primaryHuntingType && imageLoaded && (
+            <div className="absolute top-3 left-3 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-md">
+              <span className="text-gray-800 text-xs font-medium">{primaryHuntingType}</span>
             </div>
           )}
           
           {/* Wishlist button */}
           <button 
-            className="absolute top-3 right-3 text-gray-100 hover:text-white"
+            className="absolute top-3 right-3 p-2 bg-white/90 hover:bg-white backdrop-blur-sm rounded-full transition-all duration-200 hover:scale-110"
             onClick={handleWishlist}
             disabled={isLoading}
+            aria-label={wishlistStatus ? "Remove from wishlist" : "Add to wishlist"}
           >
             <Heart 
               className={cn(
-                "text-xl drop-shadow-md", 
-                wishlistStatus ? "fill-primary text-primary" : "fill-transparent text-white"
+                "w-5 h-5 transition-all duration-200", 
+                wishlistStatus ? "fill-red-500 text-red-500" : "fill-transparent text-gray-700 hover:text-red-500"
               )} 
             />
           </button>
-          
-          {/* We removed the pagination dots since we're using a grid display */}
         </div>
 
-        {/* Property Info */}
-        <div className="p-4">
-          <div className="flex justify-between items-start">
-            <h3 className="font-semibold text-lg text-ellipsis">{title}</h3>
-            {rating && (
-              <div className="flex items-center">
-                <i className="fas fa-star text-primary text-sm"></i>
-                <span className="ml-1 text-sm font-medium">{rating.toFixed(2)}</span>
+        {/* Property Info with fixed heights to prevent CLS */}
+        <div className="p-4 space-y-2">
+          {/* Title and Rating Section - Fixed height */}
+          <div className="min-h-[28px] flex justify-between items-start gap-2">
+            <h3 className="font-semibold text-lg leading-tight line-clamp-1 flex-1 text-gray-900">
+              {propertyName}
+            </h3>
+            {rating !== undefined && rating > 0 && (
+              <div className="flex items-center flex-shrink-0 gap-1">
+                <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+                <span className="text-sm font-medium text-gray-900">{rating.toFixed(1)}</span>
               </div>
             )}
           </div>
-          <p className="text-gray-500 text-sm mt-1">{location || 'Location not specified'}</p>
-          {dates && <p className="text-gray-500 text-sm">{dates}</p>}
-          <p className="mt-2"><span className="font-semibold">${price}</span> night</p>
+          
+          {/* Location Section - Fixed height */}
+          <div className="min-h-[20px] flex items-center gap-1">
+            <MapPin className="w-3 h-3 text-gray-400" />
+            <p className="text-gray-600 text-sm line-clamp-1">{getLocationString()}</p>
+          </div>
+          
+          {/* Dates Section - Fixed height even if no dates */}
+          <div className="min-h-[20px]">
+            {dates ? (
+              <p className="text-gray-500 text-sm">{dates}</p>
+            ) : (
+              <p className="text-gray-400 text-xs">Available year-round</p>
+            )}
+          </div>
+          
+          {/* Price and Package Info Section - Fixed height */}
+          <div className="min-h-[48px] pt-2 border-t border-gray-100">
+            {displayPrice > 0 ? (
+              <div>
+                <p className="flex items-baseline gap-1">
+                  <span className="text-lg font-semibold text-gray-900">${displayPrice}</span>
+                  <span className="text-gray-500 text-sm">/ package</span>
+                </p>
+                {/* Package info */}
+                {huntingPackages && huntingPackages.length > 0 && (
+                  <p className="text-gray-500 text-xs mt-1">
+                    {huntingPackages.length} hunting {huntingPackages.length === 1 ? 'package' : 'packages'} • 
+                    {' '}{Math.min(...huntingPackages.map(pkg => pkg.duration || 1))}-{Math.max(...huntingPackages.map(pkg => pkg.duration || 1))} days
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div>
+                <p className="text-gray-500 text-sm">Contact for pricing</p>
+                {huntingPackages && huntingPackages.length > 0 && (
+                  <p className="text-gray-400 text-xs mt-1">
+                    {huntingPackages.length} package{huntingPackages.length > 1 ? 's' : ''} available
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </Link>
   );
 }
+
+// Export skeleton component for use in loading states
+export { PropertyCardSkeleton };

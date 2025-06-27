@@ -61,50 +61,41 @@ export default function HomePage() {
   
   // Fetch only approved properties from API for all users
   const { data: properties, isLoading, error } = useQuery<Property[]>({
-    queryKey: ["/api/v1/properties", { approvedOnly: true }],
+    queryKey: ["/api/v1/properties/", { approvedOnly: true }],
   });
   
-  // Fetch user's wishlist
+  // FIXED: Fetch user's wishlist using consistent Bearer token authentication
   const { data: wishlistItems } = useQuery<(Wishlist & { property: Property })[]>({
-    queryKey: ["/api/v1/user/wishlists"],
+    queryKey: ["/api/v1/user/wishlists/"],
     enabled: !!user, // Only run this query if user is logged in
-    queryFn: async ({ queryKey }) => {
-      try {
-        const res = await fetch(queryKey[0] as string, {
-          credentials: "include",
-        });
-        if (res.status === 401) return []; // Return empty array if unauthorized
-        if (!res.ok) throw new Error("Failed to fetch wishlist");
-        return await res.json();
-      } catch (e) {
-        console.error("Error fetching wishlist:", e);
-        return []; // Return empty array on error
-      }
-    }
+    // REMOVED custom queryFn - now uses default Bearer token authentication from queryClient.ts
   });
   
   // Apply filters to properties
   const filteredProperties = properties?.filter(property => {
-    // Filter by category (property type)
-    if (filters.category && property.propertyType !== filters.category) {
+    // Filter by category (property type) - updated for new schema
+    if (filters.category && property.primary_terrain !== filters.category) {
       return false;
     }
     
-    // Filter by price range
-    if (property.price < filters.priceRange[0] || property.price > filters.priceRange[1]) {
+    // Filter by price range - updated to use hunting packages
+    if (property.hunting_packages && Array.isArray(property.hunting_packages)) {
+      const minPrice = Math.min(...property.hunting_packages.map((pkg: any) => pkg.price || 0));
+      if (minPrice < filters.priceRange[0] || minPrice > filters.priceRange[1]) {
+        return false;
+      }
+    }
+    
+    // Filter by season - updated for new schema
+    if (filters.season && !(property.facilities as string[])?.includes(filters.season)) {
       return false;
     }
     
-    // Filter by season
-    if (filters.season && !(property.amenities as string[])?.includes(filters.season)) {
-      return false;
-    }
-    
-    // Filter by hunting types
+    // Filter by hunting types - updated for new schema
     if (filters.huntingType.length > 0) {
-      const propertyAmenities = property.amenities as string[];
+      const propertyHuntingTypes = property.hunting_packages?.map((pkg: any) => pkg.huntingType) || [];
       const hasMatchingType = filters.huntingType.some(type => 
-        propertyAmenities?.includes(type)
+        propertyHuntingTypes.includes(type)
       );
       if (!hasMatchingType) {
         return false;
@@ -136,6 +127,26 @@ export default function HomePage() {
     if (propertyCard) {
       propertyCard.scrollIntoView({ behavior: 'smooth' });
     }
+  };
+
+  // Helper function to convert new property format to map format
+  const getPropertiesForMap = () => {
+    if (!properties) return [];
+    
+    return properties.map(property => ({
+      ...property,
+      // Map new schema fields to what PropertyMap expects
+      title: property.property_name,
+      price: property.hunting_packages && property.hunting_packages.length > 0 
+        ? Math.min(...property.hunting_packages.map((pkg: any) => pkg.price || 0))
+        : 0,
+      location: `${property.city}, ${property.state}`,
+      images: property.property_images?.map((img: any) => 
+        typeof img === 'string' ? img : img.url
+      ) || [],
+      latitude: property.latitude?.toString(),
+      longitude: property.longitude?.toString(),
+    }));
   };
 
   return (
@@ -176,14 +187,7 @@ export default function HomePage() {
       </div>
         
       {/* Sticky Search Bar */}
-      <div 
-        ref={searchBarRef}
-        className={`${
-          isSticky 
-            ? 'fixed top-20 left-0 right-0 z-30' 
-            : 'relative'
-        } transition-all duration-300`}
-      >
+      <div className="sticky top-20 z-30 bg-white">
         <div className="mx-auto max-w-5xl px-4 py-4">
           <div className="bg-white rounded-lg shadow-lg p-4 border border-gray-200">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
@@ -336,11 +340,12 @@ export default function HomePage() {
                         <div key={property.id} id={`property-${property.id}`} className="mb-6">
                           <PropertyCard
                             id={property.id}
-                            title={property.title}
-                            location={`${property.city}, ${property.state}`}
-                            price={property.price}
-                            images={property.images as string[]}
-                            profileImageIndex={property.profileImageIndex || 0}
+                            propertyName={property.property_name}
+                            city={property.city}
+                            state={property.state}
+                            huntingPackages={property.hunting_packages}
+                            propertyImages={property.property_images}
+                            profileImageIndex={property.profile_image_index || 0}
                             inWishlist={wishlistItems?.some(item => item.propertyId === property.id) || false}
                           />
                         </div>
@@ -380,7 +385,7 @@ export default function HomePage() {
               <div className="w-full lg:w-2/5">
                 <div className="rounded-xl overflow-hidden shadow-lg border border-gray-200 sticky top-20" style={{ height: 'calc(100vh - 140px)', minHeight: '680px' }}>
                   <PropertyMap 
-                    properties={properties || []} 
+                    properties={getPropertiesForMap()} 
                     selectedProperty={selectedPropertyId}
                     onPropertySelect={handlePropertySelect}
                   />

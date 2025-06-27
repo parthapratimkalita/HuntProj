@@ -29,7 +29,7 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
     error,
     refetch
   } = useQuery<(Wishlist & { property: Property })[], Error>({
-    queryKey: ["/api/v1/user/wishlists"],
+    queryKey: ["/api/v1/user/wishlists/"],
     enabled: !!user, // Only run query if user is logged in
     queryFn: async ({ queryKey }) => {
       try {
@@ -68,10 +68,10 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
     },
     onMutate: async (propertyId) => {
       // Cancel any outgoing refetches
-      await queryClient.cancelQueries({ queryKey: ["/api/v1/user/wishlists"] });
+      await queryClient.cancelQueries({ queryKey: ["/api/v1/user/wishlists/"] });
 
       // Snapshot the previous value
-      const previousWishlists = queryClient.getQueryData<(Wishlist & { property: Property })[]>(["/api/v1/user/wishlists"]);
+      const previousWishlists = queryClient.getQueryData<(Wishlist & { property: Property })[]>(["/api/v1/user/wishlists/"]);
 
       // Check if it's already in wishlist
       const alreadyInWishlist = previousWishlists?.some(item => item.propertyId === propertyId);
@@ -80,7 +80,7 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
       }
 
       // Find the property from all properties cache
-      const properties = queryClient.getQueryData<Property[]>(["/api/v1/properties"]);
+      const properties = queryClient.getQueryData<Property[]>(["/api/v1/properties/"]);
       const property = properties?.find(p => p.id === propertyId);
 
       if (property && previousWishlists) {
@@ -93,7 +93,7 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
           property
         };
 
-        queryClient.setQueryData(["/api/v1/user/wishlists"], [
+        queryClient.setQueryData(["/api/v1/user/wishlists/"], [
           ...previousWishlists,
           optimisticWishlistItem
         ]);
@@ -113,7 +113,7 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
     onError: (err, propertyId, context) => {
       // Roll back on error
       if (context?.previousWishlists) {
-        queryClient.setQueryData(["/api/v1/user/wishlists"], context.previousWishlists);
+        queryClient.setQueryData(["/api/v1/user/wishlists/"], context.previousWishlists);
       }
       
       toast({
@@ -140,15 +140,15 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
     },
     onMutate: async (propertyId) => {
       // Cancel any outgoing refetches
-      await queryClient.cancelQueries({ queryKey: ["/api/v1/user/wishlists"] });
+      await queryClient.cancelQueries({ queryKey: ["/api/v1/user/wishlists/"] });
 
       // Snapshot the previous value
-      const previousWishlists = queryClient.getQueryData<(Wishlist & { property: Property })[]>(["/api/v1/user/wishlists"]);
+      const previousWishlists = queryClient.getQueryData<(Wishlist & { property: Property })[]>(["/api/v1/user/wishlists/"]);
 
       if (previousWishlists) {
         // Optimistically update the wishlist by removing the item
         const newWishlists = previousWishlists.filter(item => item.propertyId !== propertyId);
-        queryClient.setQueryData(["/api/v1/user/wishlists"], newWishlists);
+        queryClient.setQueryData(["/api/v1/user/wishlists/"], newWishlists);
       }
 
       return { previousWishlists };
@@ -165,7 +165,7 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
     onError: (err, propertyId, context) => {
       // Roll back on error
       if (context?.previousWishlists) {
-        queryClient.setQueryData(["/api/v1/user/wishlists"], context.previousWishlists);
+        queryClient.setQueryData(["/api/v1/user/wishlists/"], context.previousWishlists);
       }
       
       toast({

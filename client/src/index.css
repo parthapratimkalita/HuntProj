@@ -191,3 +191,37 @@ button[data-radix-popover-trigger]:hover {
   z-index: 50 !important;
   position: relative !important;
 }
+/* Add this CSS to your global styles or Avatar component */
+
+/* High-quality image rendering for avatars */
+.avatar-image-quality {
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
+  image-rendering: pixelated;
+  object-fit: cover;
+  object-position: center;
+}
+
+/* For Radix UI Avatar component specifically */
+[data-radix-avatar-image] {
+  image-rendering: high-quality !important;
+  image-rendering: -webkit-optimize-contrast !important;
+  image-rendering: crisp-edges !important;
+  object-fit: cover !important;
+  object-position: center !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Prevent blur on small avatar sizes */
+.avatar-container {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
+/* Alternative: Use CSS to create specific avatar sizes */
+.avatar-sm img { width: 64px; height: 64px; }
+.avatar-md img { width: 96px; height: 96px; }
+.avatar-lg img { width: 128px; height: 128px; }

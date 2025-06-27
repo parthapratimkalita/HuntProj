@@ -55,7 +55,7 @@ export default function PropertyApprovalCard({ property, viewOnly = false }: Pro
       }
       
       // Invalidate property queries
-      queryClient.invalidateQueries({ queryKey: ["/api/v1/properties"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/v1/properties/"] });
     } catch (error) {
       toast({
         title: "Action failed",

@@ -30,6 +30,7 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
+// ✅ FIXED: Updated apiRequest function to handle FormData properly
 export async function apiRequest(
   method: string,
   url: string,
@@ -40,9 +41,13 @@ export async function apiRequest(
   
   // Create headers object with Authorization if token exists
   const headers: Record<string, string> = {};
-  if (data) {
+  
+  // ✅ CRITICAL FIX: Only set Content-Type for JSON data, NOT for FormData
+  // FormData needs the browser to set Content-Type with proper boundary
+  if (data && !(data instanceof FormData)) {
     headers["Content-Type"] = "application/json";
   }
+  
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
   }
@@ -51,13 +56,26 @@ export async function apiRequest(
     method,
     url,
     hasToken: !!token,
-    tokenLength: token?.length
+    tokenLength: token?.length,
+    isFormData: data instanceof FormData,
+    contentType: headers["Content-Type"] || "auto (FormData boundary)",
+    dataType: data?.constructor?.name
   });
+
+  // ✅ FIXED: Handle body properly for both FormData and JSON
+  let body: string | FormData | undefined;
+  if (data instanceof FormData) {
+    body = data; // Send FormData directly
+  } else if (data) {
+    body = JSON.stringify(data); // Stringify non-FormData
+  } else {
+    body = undefined; // No body for GET requests
+  }
 
   const res = await fetch(url, {
     method,
     headers,
-    body: data ? JSON.stringify(data) : undefined,
+    body
   });
 
   await throwIfResNotOk(res);
@@ -92,7 +110,9 @@ export const getQueryFn: <T>(options: {
       
       // Build query string
       Object.entries(queryParams).forEach(([key, value]) => {
-        params.append(key, String(value));
+        if (value !== undefined && value !== null) {
+          params.append(key, String(value));
+        }
       });
       
       // Append query string to URL

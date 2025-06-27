@@ -15,7 +15,8 @@ import AccountSettingsPage from "@/pages/user/account-settings-page";
 import WishlistsPage from "@/pages/user/wishlists-page";
 import ProviderDashboardPage from "@/pages/provider/dashboard-page";
 import ProviderApplyPage from "@/pages/provider/apply-page";
-import PropertyFormPage from "@/pages/provider/property-form-page";
+import PropertyFormPhased from "@/pages/provider/property-form-phased"; // New phased form
+import PropertyEditPage from "@/pages/provider/property-edit-page";
 import AdminDashboardPage from "@/pages/admin/dashboard-page";
 import TestAuthPage from "@/pages/test-auth";
 import { ProtectedRoute } from "./lib/protected-route";
@@ -46,14 +47,14 @@ function Router() {
       />
       <ProtectedRoute 
         path="/provider/properties/new" 
-        component={() => <PropertyFormPage />}
+        component={() => <PropertyFormPhased />}  // Changed to use phased form
         requiredRole="provider"
       />
       <Route path="/provider/properties/:id/edit">
         {params => (
           <ProtectedRoute 
             path={`/provider/properties/${params.id}/edit`}
-            component={() => <PropertyFormPage id={params.id} />}
+            component={() => <PropertyEditPage id={params.id} />}
             requiredRole="provider"
           />
         )}
