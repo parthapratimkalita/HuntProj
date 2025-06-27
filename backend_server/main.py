@@ -20,7 +20,7 @@ app = FastAPI(
 # Set up CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5000"],  # Vite's default development server
+    allow_origins=["http://localhost:5000", "https://huntproj.onrender.com"],  # Vite's default development server
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
