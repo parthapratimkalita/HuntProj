@@ -101,11 +101,13 @@ export const getQueryFn: <T>(options: {
       headers["Authorization"] = `Bearer ${token}`;
     }
 
-    // Extract URL from queryKey[0]
-    const url = queryKey[0] as string;
+    // Extract path from queryKey[0] - this should be just the path, not full URL
+    const path = queryKey[0] as string;
+    
+    // ✅ CRITICAL FIX: Use apiUrl() to construct the full URL
+    let finalUrl = apiUrl(path);
     
     // Check if there are query parameters in queryKey[1]
-    let finalUrl = url;
     if (queryKey.length > 1 && typeof queryKey[1] === 'object') {
       // Convert query parameters to URL search params
       const params = new URLSearchParams();
@@ -121,14 +123,16 @@ export const getQueryFn: <T>(options: {
       // Append query string to URL
       const queryString = params.toString();
       if (queryString) {
-        finalUrl = `${url}?${queryString}`;
+        finalUrl = `${finalUrl}?${queryString}`;
       }
     }
 
     console.log("Query Function DEBUG:", {
-      url: finalUrl,
+      path,
+      finalUrl,
       hasToken: !!token,
-      tokenLength: token?.length
+      tokenLength: token?.length,
+      baseUrl: import.meta.env.VITE_API_BASE_URL
     });
 
     const res = await fetch(finalUrl, {
