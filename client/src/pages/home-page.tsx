@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Property, Wishlist } from "@shared/schema";
 import Header from "@/components/layout/header";
@@ -29,80 +29,16 @@ export default function HomePage() {
     season: "",
     huntingType: [],
   });
-
-  // Sticky search bar state
-  const [isSticky, setIsSticky] = useState(false);
-  const searchBarRef = useRef<HTMLDivElement>(null);
-  const [searchBarTop, setSearchBarTop] = useState(0);
-
-  // Sticky search bar effect
-  useEffect(() => {
-    // Get the initial position of the search bar
-    if (searchBarRef.current) {
-      const rect = searchBarRef.current.getBoundingClientRect();
-      setSearchBarTop(rect.top + window.scrollY);
-    }
-
-    const handleScroll = () => {
-      const scrollTop = window.scrollY;
-      const headerHeight = 80; // Adjust based on your header height
-      
-      // Check if search bar should stick
-      if (scrollTop >= (searchBarTop - headerHeight)) {
-        setIsSticky(true);
-      } else {
-        setIsSticky(false);
-      }
-    };
-
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [searchBarTop]);
-  
-
-  useEffect(() => {
-    // Test direct API call
-    const testAPI = async () => {
-      try {
-        const url = `${import.meta.env.VITE_API_BASE_URL}/api/v1/properties?approvedOnly=true`;
-        console.log('🔍 Testing direct API call to:', url);
-        
-        const response = await fetch(url, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          }
-        });
-        
-        console.log('📡 API Response Status:', response.status);
-        console.log('📡 API Response OK:', response.ok);
-        
-        if (response.ok) {
-          const data = await response.json();
-          console.log('✅ Direct API Success - Properties found:', data.length);
-          console.log('📋 Sample property:', data[0]);
-        } else {
-          const errorText = await response.text();
-          console.error('❌ Direct API Error Response:', errorText);
-        }
-      } catch (error) {
-        console.error('💥 Direct API Request Failed:', error);
-      }
-    };
-    
-    testAPI();
-  }, []);
   
   // Fetch only approved properties from API for all users
   const { data: properties, isLoading, error } = useQuery<Property[]>({
-    queryKey: ["/api/v1/properties/", { approvedOnly: true }],
+    queryKey: ["/api/v1/properties", { approvedOnly: true }],
   });
   
-  // FIXED: Fetch user's wishlist using consistent Bearer token authentication
+  // Fetch user's wishlist using consistent Bearer token authentication
   const { data: wishlistItems } = useQuery<(Wishlist & { property: Property })[]>({
-    queryKey: ["/api/v1/user/wishlists/"],
+    queryKey: ["/api/v1/user/wishlists"],
     enabled: !!user, // Only run this query if user is logged in
-    // REMOVED custom queryFn - now uses default Bearer token authentication from queryClient.ts
   });
   
   // Apply filters to properties
@@ -220,48 +156,43 @@ export default function HomePage() {
         </div>
       </div>
         
-      {/* Sticky Search Bar */}
-      <div className="sticky top-20 z-30 bg-white">
-        <div className="mx-auto max-w-5xl px-4 py-4">
-          <div className="bg-white rounded-lg shadow-lg p-4 border border-gray-200">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
-              <div className="border rounded-lg p-3">
-                <div className="text-xs text-gray-500">Destination</div>
-                <div className="flex items-center">
-                  <input 
-                    type="text" 
-                    placeholder="Where?" 
-                    className="w-full outline-none text-sm" 
-                  />
-                </div>
-              </div>
-              
-              <div className="col-span-1 md:col-span-2">
-                <DateRangePicker 
-                  onSelect={(range) => {
-                    console.log("Selected date range:", range);
-                    // You can update application state here with the selected dates
-                  }}
+      {/* Search Bar Section - Using CSS Sticky */}
+      <div className="mx-auto max-w-5xl px-4 py-4 sticky top-20 z-30">
+        <div className="bg-white rounded-lg shadow-lg p-4 border border-gray-200">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+            <div className="border rounded-lg p-3">
+              <div className="text-xs text-gray-500">Destination</div>
+              <div className="flex items-center">
+                <input 
+                  type="text" 
+                  placeholder="Where?" 
+                  className="w-full outline-none text-sm" 
                 />
               </div>
-              
-              <div className="flex items-center">
-                <div className="border rounded-lg p-3 flex-grow">
-                  <div className="text-xs text-gray-500">Guests</div>
-                  <div className="text-sm">Add guests...</div>
-                </div>
-                <button className="bg-amber-500 hover:bg-amber-600 text-white p-3 ml-2 rounded-lg">
-                  <Search size={20} />
-                </button>
+            </div>
+            
+            <div className="col-span-1 md:col-span-2">
+              <DateRangePicker 
+                onSelect={(range) => {
+                  console.log("Selected date range:", range);
+                  // You can update application state here with the selected dates
+                }}
+              />
+            </div>
+            
+            <div className="flex items-center">
+              <div className="border rounded-lg p-3 flex-grow">
+                <div className="text-xs text-gray-500">Guests</div>
+                <div className="text-sm">Add guests...</div>
               </div>
+              <button className="bg-amber-500 hover:bg-amber-600 text-white p-3 ml-2 rounded-lg">
+                <Search size={20} />
+              </button>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Spacer when search bar becomes sticky */}
-      {isSticky && <div className="h-24"></div>}
-      
       {/* Game Type Categories */}
       <div className="bg-white pt-8 pb-6">
         <div className="container mx-auto px-4">
@@ -417,7 +348,7 @@ export default function HomePage() {
             {/* Map Section - Toggle visibility with the map button */}
             {showMap && (
               <div className="w-full lg:w-2/5">
-                <div className="rounded-xl overflow-hidden shadow-lg border border-gray-200 sticky top-20" style={{ height: 'calc(100vh - 140px)', minHeight: '680px' }}>
+                <div className="rounded-xl overflow-hidden shadow-lg border border-gray-200 sticky top-32" style={{ height: 'calc(100vh - 140px)', minHeight: '680px' }}>
                   <PropertyMap 
                     properties={getPropertiesForMap()} 
                     selectedProperty={selectedPropertyId}

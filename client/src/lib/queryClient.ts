@@ -1,6 +1,5 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { supabase } from '@/lib/supabaseClient';
-import { apiUrl } from "@/lib/api";
 
 // Helper function to get current Supabase token
 async function getSupabaseToken(): Promise<string | null> {
@@ -34,7 +33,7 @@ async function throwIfResNotOk(res: Response) {
 // ✅ FIXED: Updated apiRequest function to handle FormData properly
 export async function apiRequest(
   method: string,
-  path: string, // <-- rename 'url' to 'path'
+  url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
   // Get JWT token from Supabase instead of localStorage
@@ -55,7 +54,7 @@ export async function apiRequest(
 
   console.log('API Request DEBUG:', {
     method,
-    path,
+    url,
     hasToken: !!token,
     tokenLength: token?.length,
     isFormData: data instanceof FormData,
@@ -73,9 +72,7 @@ export async function apiRequest(
     body = undefined; // No body for GET requests
   }
 
-  const fullUrl = apiUrl(path);
-
-  const res = await fetch(fullUrl, {
+  const res = await fetch(url, {
     method,
     headers,
     body
@@ -101,13 +98,11 @@ export const getQueryFn: <T>(options: {
       headers["Authorization"] = `Bearer ${token}`;
     }
 
-    // Extract path from queryKey[0] - this should be just the path, not full URL
-    const path = queryKey[0] as string;
-    
-    // ✅ CRITICAL FIX: Use apiUrl() to construct the full URL
-    let finalUrl = apiUrl(path);
+    // Extract URL from queryKey[0]
+    const url = queryKey[0] as string;
     
     // Check if there are query parameters in queryKey[1]
+    let finalUrl = url;
     if (queryKey.length > 1 && typeof queryKey[1] === 'object') {
       // Convert query parameters to URL search params
       const params = new URLSearchParams();
@@ -123,16 +118,14 @@ export const getQueryFn: <T>(options: {
       // Append query string to URL
       const queryString = params.toString();
       if (queryString) {
-        finalUrl = `${finalUrl}?${queryString}`;
+        finalUrl = `${url}?${queryString}`;
       }
     }
 
     console.log("Query Function DEBUG:", {
-      path,
-      finalUrl,
+      url: finalUrl,
       hasToken: !!token,
-      tokenLength: token?.length,
-      baseUrl: import.meta.env.VITE_API_BASE_URL
+      tokenLength: token?.length
     });
 
     const res = await fetch(finalUrl, {
