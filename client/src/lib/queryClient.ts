@@ -1,5 +1,6 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { supabase } from '@/lib/supabaseClient';
+import { apiUrl } from "@/lib/api";
 
 // Helper function to get current Supabase token
 async function getSupabaseToken(): Promise<string | null> {
@@ -33,7 +34,7 @@ async function throwIfResNotOk(res: Response) {
 // ✅ FIXED: Updated apiRequest function to handle FormData properly
 export async function apiRequest(
   method: string,
-  url: string,
+  path: string, // <-- rename 'url' to 'path'
   data?: unknown | undefined,
 ): Promise<Response> {
   // Get JWT token from Supabase instead of localStorage
@@ -54,7 +55,7 @@ export async function apiRequest(
 
   console.log('API Request DEBUG:', {
     method,
-    url,
+    path,
     hasToken: !!token,
     tokenLength: token?.length,
     isFormData: data instanceof FormData,
@@ -72,7 +73,9 @@ export async function apiRequest(
     body = undefined; // No body for GET requests
   }
 
-  const res = await fetch(url, {
+  const fullUrl = apiUrl(path);
+
+  const res = await fetch(fullUrl, {
     method,
     headers,
     body
