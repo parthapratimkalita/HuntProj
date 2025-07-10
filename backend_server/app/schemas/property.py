@@ -13,7 +13,7 @@ class PropertyStatusEnum(str, Enum):
 class AcreageBreakdown(BaseModel):
     acres: int
     terrainType: str = Field(alias="terrain_type")  # Accept both camelCase and snake_case
-    description: Optional[str] = None
+    # description: Optional[str] = None
     
     class Config:
         allow_population_by_field_name = True  # Allow both field names
@@ -21,9 +21,9 @@ class AcreageBreakdown(BaseModel):
 
 class WildlifeInfo(BaseModel):
     species: str
-    estimatedPopulation: int = Field(alias="estimated_population")  # Accept both formats
-    populationDensity: str = Field(alias="population_density")      # Accept both formats
-    seasonInfo: Optional[str] = Field(default=None, alias="season_info")  # Accept both formats
+    #estimatedPopulation: int = Field(alias="estimated_population")  # Accept both formats
+    populationDensity: int = Field(alias="population_density", ge=0, le=100) 
+    #seasonInfo: Optional[str] = Field(default=None, alias="season_info")  # Accept both formats
     
     class Config:
         allow_population_by_field_name = True  # Allow both field names
@@ -82,7 +82,7 @@ class PropertyDraftCreate(BaseModel):
     
     # Property Details
     total_acres: int = Field(..., gt=0)
-    primary_terrain: Optional[str] = None
+    #primary_terrain: Optional[str] = None
     
     # Optional for Phase 1 - Handle both naming conventions
     acreage_breakdown: Optional[List[AcreageBreakdown]] = []
@@ -114,7 +114,7 @@ class PropertyCreate(BaseModel):
     
     # Property Details
     total_acres: int = Field(..., gt=0)
-    primary_terrain: Optional[str] = None
+    #primary_terrain: Optional[str] = None
     acreage_breakdown: Optional[List[AcreageBreakdown]] = []
     wildlife_info: Optional[List[WildlifeInfo]] = []
     
@@ -155,7 +155,7 @@ class PropertyUpdate(BaseModel):
     
     # Always editable
     total_acres: Optional[int] = None
-    primary_terrain: Optional[str] = None
+    #primary_terrain: Optional[str] = None
     acreage_breakdown: Optional[List[AcreageBreakdown]] = None
     wildlife_info: Optional[List[WildlifeInfo]] = None
     hunting_packages: Optional[List[HuntingPackage]] = None
@@ -205,7 +205,7 @@ class Property(BaseModel):
     
     # Property Details
     total_acres: int
-    primary_terrain: Optional[str]
+    #primary_terrain: Optional[str]
     acreage_breakdown: Optional[List[AcreageBreakdown]]
     wildlife_info: Optional[List[WildlifeInfo]]
     
@@ -268,7 +268,7 @@ class PropertySimple(BaseModel):
     
     # Property Details
     total_acres: int
-    primary_terrain: Optional[str]
+    #primary_terrain: Optional[str]
     acreage_breakdown: Optional[List[AcreageBreakdown]]
     wildlife_info: Optional[List[WildlifeInfo]]
     

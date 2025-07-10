@@ -59,7 +59,7 @@ export default function BasicInfoSection({
               <FormLabel>Property Description *</FormLabel>
               <FormControl>
                 <Textarea 
-                  placeholder="Describe your property, terrain, wildlife, and what makes it special" 
+                  placeholder="Describe your hunting ground, terrain, wildlife and what makes it special. Feel free to also describe yourinfrastructure." 
                   {...field} 
                   rows={4}
                 />
@@ -98,31 +98,6 @@ export default function BasicInfoSection({
             )}
           />
           
-          <FormField
-            control={form.control}
-            name="terrain"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Primary Terrain Type</FormLabel>
-                <FormControl>
-                  <select 
-                    className="w-full p-2 border border-gray-300 rounded-md"
-                    value={field.value || ""}
-                    onChange={(e) => field.onChange(e.target.value)}
-                  >
-                    <option value="">Select primary terrain</option>
-                    {terrainTypes.map(terrain => (
-                      <option key={terrain.id} value={terrain.id}>{terrain.name}</option>
-                    ))}
-                  </select>
-                </FormControl>
-                <p className="text-xs text-gray-500 mt-1">
-                  Select the main terrain type of your property
-                </p>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
         </div>
 
         {/* Detailed Acreage Breakdown */}
@@ -189,16 +164,6 @@ export default function BasicInfoSection({
                         ))}
                       </select>
                     </div>
-                  </div>
-                  
-                  <div>
-                    <label className="text-sm font-medium">Description (optional)</label>
-                    <Textarea 
-                      placeholder="Describe this terrain area - vegetation, topography, hunting opportunities"
-                      value={breakdown.description || ""}
-                      onChange={(e) => onUpdateAcreageBreakdown(index, 'description', e.target.value)}
-                      rows={2}
-                    />
                   </div>
                 </CardContent>
               </Card>

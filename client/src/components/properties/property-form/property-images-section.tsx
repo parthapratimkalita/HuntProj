@@ -24,10 +24,8 @@ interface PropertyImagesSectionProps {
   profileImageIndex: number;
   setProfileImageIndex: (index: number) => void;
   isSubmitting: boolean;
-  // New props for uploaded URLs
   uploadedImageUrls: string[];
   setUploadedImageUrls: (urls: string[]) => void;
-  // Optional prop to indicate edit mode
   isEditMode?: boolean;
   existingImages?: string[];
 }
@@ -52,37 +50,38 @@ export default function PropertyImagesSection({
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadingFileIndex, setUploadingFileIndex] = useState<number>(-1);
 
-  // Maximum total images allowed
   const MAX_TOTAL_IMAGES = 20;
 
-  // Create and manage preview URLs
+  // Calculate counts
+  const existingImageCount = existingImages.length;
+  const newUploadedCount = uploadedImageUrls.length - existingImageCount;
+  const pendingUploadCount = selectedImages.length - newUploadedCount;
+  const totalImageCount = uploadedImageUrls.length + pendingUploadCount;
+
+  // Effect for managing preview URLs only
   useEffect(() => {
-    // Revoke old blob URLs to prevent memory leaks
+    // Only update if the lengths actually changed
+    const expectedLength = uploadedImageUrls.length + Math.max(0, selectedImages.length - Math.max(0, uploadedImageUrls.length - existingImages.length));
+    
+    if (imagePreviewUrls.length === expectedLength) {
+      return; // ✅ Guard against unnecessary updates
+    }
+  
+    // Cleanup old URLs
     imagePreviewUrls.forEach(url => {
       if (url.startsWith('blob:')) {
         URL.revokeObjectURL(url);
       }
     });
     
-    // Create preview URLs - mix uploaded URLs and local blob URLs
     const newUrls: string[] = [];
-    
-    // Add already uploaded images (including existing ones)
     uploadedImageUrls.forEach(url => newUrls.push(url));
-    
-    // Add local file previews for unuploaded files
     selectedImages.slice(Math.max(0, uploadedImageUrls.length - existingImages.length)).forEach(file => {
       newUrls.push(URL.createObjectURL(file));
     });
     
     setImagePreviewUrls(newUrls);
     
-    // Update form value to indicate images exist (for validation)
-    if (isEditMode && newUrls.length > 0) {
-      form.setValue('propertyImages', newUrls as any);
-    }
-    
-    // Cleanup function
     return () => {
       newUrls.forEach(url => {
         if (url.startsWith('blob:')) {
@@ -90,13 +89,28 @@ export default function PropertyImagesSection({
         }
       });
     };
-  }, [selectedImages, uploadedImageUrls, existingImages, isEditMode, form]);
+  }, [
+    selectedImages.length,     // ✅ Only length
+    uploadedImageUrls.length,  // ✅ Only length  
+    existingImages.length      // ✅ Only length
+  ]);
 
-  // Calculate counts
-  const existingImageCount = existingImages.length;
-  const newUploadedCount = uploadedImageUrls.length - existingImageCount;
-  const pendingUploadCount = selectedImages.length - newUploadedCount;
-  const totalImageCount = uploadedImageUrls.length + pendingUploadCount;
+  // Separate effect for updating form value - only when uploaded URLs change
+  useEffect(() => {
+    if (uploadedImageUrls.length > 0) {
+      if (isEditMode) {
+        form.setValue('propertyImages', uploadedImageUrls as any, {
+          shouldValidate: false,
+          shouldDirty: false  // ✅ Critical fix
+        });
+      } else {
+        form.setValue('propertyImages', selectedImages.length > 0 ? selectedImages : undefined, {
+          shouldValidate: false,
+          shouldDirty: false  // ✅ Critical fix
+        });
+      }
+    }
+  }, [uploadedImageUrls.length, selectedImages.length, isEditMode]);
 
   // Upload single image to Supabase
   const uploadImageToSupabase = async (file: File, userId: string): Promise<string> => {
@@ -225,11 +239,6 @@ export default function PropertyImagesSection({
     const updatedFiles = [...selectedImages, ...newFiles];
     setSelectedImages(updatedFiles);
     
-    // Update form value with file count (for validation)
-    if (!isEditMode) {
-      form.setValue('propertyImages', updatedFiles.length > 0 ? updatedFiles : undefined);
-    }
-    
     // Clear the input so the same file can be selected again
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -263,12 +272,6 @@ export default function PropertyImagesSection({
       const newSelectedFiles = [...selectedImages];
       newSelectedFiles.splice(fileIndex, 1);
       setSelectedImages(newSelectedFiles);
-    }
-    
-    // Update form value
-    const totalRemaining = totalImageCount - 1;
-    if (!isEditMode) {
-      form.setValue('propertyImages', totalRemaining > 0 ? selectedImages : undefined);
     }
     
     // Adjust profile image index if necessary

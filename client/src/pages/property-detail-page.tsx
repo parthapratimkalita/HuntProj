@@ -168,8 +168,6 @@ const PropertyDetailSkeleton = () => {
   );
 };
 
-
-
 function PropertyLocationMap({ property, className = "" }: PropertyLocationMapProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [mapLoaded, setMapLoaded] = useState(false);
@@ -196,10 +194,10 @@ function PropertyLocationMap({ property, className = "" }: PropertyLocationMapPr
   }, []);
 
   useEffect(() => {
-    if (mapLoaded && property.latitude && property.longitude) {
+    if (mapLoaded && property.latitude && property.longitude && !isExpanded) {
       initializeMap('property-map', false);
     }
-  }, [mapLoaded, property]);
+  }, [mapLoaded, property, isExpanded]);
 
   useEffect(() => {
     if (isExpanded && mapLoaded && property.latitude && property.longitude) {
@@ -307,79 +305,82 @@ function PropertyLocationMap({ property, className = "" }: PropertyLocationMapPr
 
   return (
     <>
-      <Card className={className}>
-        <CardHeader>
-          <div className="flex justify-between items-center">
-            <CardTitle className="flex items-center">
-              <MapPin className="w-5 h-5 mr-2" />
-              Property Location
-            </CardTitle>
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => setIsExpanded(true)}
-              className="flex items-center"
-            >
-              <Maximize2 className="w-4 h-4 mr-2" />
-              Expand Map
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {/* Location Details */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
-              <div>
-                <div className="text-sm text-gray-600">Address</div>
-                <div className="font-medium">{property.address}</div>
-              </div>
-              <div>
-                <div className="text-sm text-gray-600">City, State</div>
-                <div className="font-medium">{property.city}, {property.state} {property.zip_code}</div>
-              </div>
-              <div>
-                <div className="text-sm text-gray-600">Coordinates</div>
-                <div className="font-medium text-sm">
-                  {parseFloat(property.latitude).toFixed(4)}, {parseFloat(property.longitude).toFixed(4)}
+      {/* Only show the small map card when NOT expanded */}
+      {!isExpanded && (
+        <Card className={className}>
+          <CardHeader>
+            <div className="flex justify-between items-center">
+              <CardTitle className="flex items-center">
+                <MapPin className="w-5 h-5 mr-2" />
+                Property Location
+              </CardTitle>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setIsExpanded(true)}
+                className="flex items-center"
+              >
+                <Maximize2 className="w-4 h-4 mr-2" />
+                Expand Map
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {/* Location Details */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
+                <div>
+                  <div className="text-sm text-gray-600">Address</div>
+                  <div className="font-medium">{property.address}</div>
+                </div>
+                <div>
+                  <div className="text-sm text-gray-600">City, State</div>
+                  <div className="font-medium">{property.city}, {property.state} {property.zip_code}</div>
+                </div>
+                <div>
+                  <div className="text-sm text-gray-600">Coordinates</div>
+                  <div className="font-medium text-sm">
+                    {parseFloat(property.latitude).toFixed(4)}, {parseFloat(property.longitude).toFixed(4)}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-sm text-gray-600">Property Size</div>
+                  <div className="font-medium">{property.total_acres} acres</div>
                 </div>
               </div>
-              <div>
-                <div className="text-sm text-gray-600">Property Size</div>
-                <div className="font-medium">{property.total_acres} acres</div>
+
+              {/* Map Container */}
+              <div className="relative">
+                <div 
+                  id="property-map" 
+                  className="w-full h-64 rounded-lg border border-gray-200 bg-gray-100 flex items-center justify-center"
+                  style={{ minHeight: '256px' }}
+                >
+                  {!mapLoaded && (
+                    <div className="text-gray-500 text-center">
+                      <Map className="w-8 h-8 mx-auto mb-2" />
+                      <div>Loading map...</div>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Overlay for click to expand */}
+                <div 
+                  className="absolute inset-0 bg-transparent cursor-pointer rounded-lg"
+                  onClick={() => setIsExpanded(true)}
+                  title="Click to expand map"
+                />
+              </div>
+
+              {/* Map Info */}
+              <div className="text-sm text-gray-600 text-center">
+                <MapPin className="w-4 h-4 inline mr-1" />
+                Approximate location • Click map to explore area
               </div>
             </div>
-
-            {/* Map Container */}
-            <div className="relative">
-              <div 
-                id="property-map" 
-                className="w-full h-64 rounded-lg border border-gray-200 bg-gray-100 flex items-center justify-center"
-                style={{ minHeight: '256px' }}
-              >
-                {!mapLoaded && (
-                  <div className="text-gray-500 text-center">
-                    <Map className="w-8 h-8 mx-auto mb-2" />
-                    <div>Loading map...</div>
-                  </div>
-                )}
-              </div>
-              
-              {/* Overlay for click to expand */}
-              <div 
-                className="absolute inset-0 bg-transparent cursor-pointer rounded-lg"
-                onClick={() => setIsExpanded(true)}
-                title="Click to expand map"
-              />
-            </div>
-
-            {/* Map Info */}
-            <div className="text-sm text-gray-600 text-center">
-              <MapPin className="w-4 h-4 inline mr-1" />
-              Approximate location • Click map to explore area
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Expanded Map Modal */}
       <Dialog open={isExpanded} onOpenChange={setIsExpanded}>
@@ -526,9 +527,10 @@ export default function PropertyDetailPage({ id }: PropertyDetailPageProps) {
     return path.startsWith('/') ? path : `/${path}`;
   };
 
-  const displayImages = getDisplayImages();
-  const profileImage = displayImages[property.profile_image_index || 0] || displayImages[0];
-  const otherImages = displayImages.filter((_, index) => index !== (property.profile_image_index || 0));
+  // Add type annotations here - this is "typing at the source"
+  const displayImages: string[] = getDisplayImages();
+  const profileImage: string = displayImages[property.profile_image_index || 0] || displayImages[0];
+  const otherImages: string[] = displayImages.filter((_, index) => index !== (property.profile_image_index || 0));
 
   // Calculate booking details based on selected package
   const packagePrice = selectedPackage?.price || 0;
@@ -759,16 +761,12 @@ export default function PropertyDetailPage({ id }: PropertyDetailPageProps) {
                             {sanitizedWildlife.species.replace(/_/g, ' ')}
                           </h4>
                           <div className="space-y-1 text-sm text-gray-600">
-                            <div>Population: ~{sanitizedWildlife.estimatedPopulation}</div>
                             <div>
                               Density: 
                               <Badge variant="outline" className="text-xs ml-2">
                                 {sanitizedWildlife.populationDensity}
                               </Badge>
                             </div>
-                            {sanitizedWildlife.seasonInfo && (
-                              <div>Best season: {sanitizedWildlife.seasonInfo}</div>
-                            )}
                           </div>
                         </div>
                       );
@@ -800,9 +798,6 @@ export default function PropertyDetailPage({ id }: PropertyDetailPageProps) {
                             </h4>
                             <Badge variant="secondary">{sanitizedTerrain.acres} acres</Badge>
                           </div>
-                          {sanitizedTerrain.description && (
-                            <p className="text-sm text-gray-600">{sanitizedTerrain.description}</p>
-                          )}
                         </div>
                       );
                     })}

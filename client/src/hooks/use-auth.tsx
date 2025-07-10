@@ -1,6 +1,7 @@
 import { useEffect, useState, createContext, useContext, ReactNode, useCallback } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useMutation, UseMutationResult } from '@tanstack/react-query';
+import { apiUrl } from '@/lib/api';
 
 interface AuthContextType {
   user: any;
@@ -34,7 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     console.log('AUTH DEBUG: Syncing profile data from Supabase metadata:', profileData);
 
     try {
-      const response = await fetch('/api/v1/users/sync-profile', {
+      const response = await fetch(apiUrl('/api/v1/users/sync-profile'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -54,7 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } else if (result.user_id) {
           // It's a message object, need to fetch the user
           console.log('AUTH DEBUG: Got message response, fetching user profile...');
-          const userResponse = await fetch('/api/v1/users/me', {
+          const userResponse = await fetch(apiUrl('/api/v1/users/me'), {
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json',
@@ -94,7 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const token = session.data.session.access_token;
       console.log('AUTH DEBUG: Refreshing user profile...');
       
-      const response = await fetch('/api/v1/users/me', {
+      const response = await fetch(apiUrl('/api/v1/users/me'), {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -152,7 +153,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       console.log('AUTH DEBUG: Fetching user profile from backend...');
       
-      const response = await fetch('/api/v1/users/me', {
+      const response = await fetch(apiUrl('/api/v1/users/me'), {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',

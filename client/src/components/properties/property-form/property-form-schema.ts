@@ -9,15 +9,15 @@ export type AccommodationStatus = z.infer<typeof accommodationStatusEnum>;
 export const acreageBreakdownSchema = z.object({
   acres: z.coerce.number().min(1, "Acreage must be at least 1"),
   terrainType: z.string().min(1, "Terrain type is required"),
-  description: z.string().optional(),
+  //description: z.string().optional(),
 });
 
 // Schema for wildlife/game information - UPDATED with number for population
 export const wildlifeInfoSchema = z.object({
   species: z.string().min(1, "Species is required"),
-  estimatedPopulation: z.coerce.number().min(0, "Population must be a positive number"),
-  populationDensity: z.enum(["abundant", "common", "moderate", "limited", "rare"]),
-  seasonInfo: z.string().optional(),
+  //estimatedPopulation: z.coerce.number().min(0, "Population must be a positive number"),
+  populationDensity: z.coerce.number().min(0).max(100, "Population density must be between 0 and 100"),
+  //seasonInfo: z.string().optional(),
 });
 
 // Schema for accommodation options
@@ -126,7 +126,7 @@ export const propertyDraftSchema = z.object({
   
   // Basic details
   totalAcres: z.coerce.number().min(1, "Total acreage is required"),
-  terrain: z.string().optional(),
+  //terrain: z.string().optional(),
   acreageBreakdown: z.array(acreageBreakdownSchema).optional(),
   wildlifeInfo: z.array(wildlifeInfoSchema).optional(),
   
@@ -155,7 +155,7 @@ export const propertyFormSchema = z.object({
   // Property Details
   totalAcres: z.coerce.number().min(1, "Total acreage is required"),
   acreageBreakdown: z.array(acreageBreakdownSchema).optional(),
-  terrain: z.string().optional(), // Keep for backward compatibility
+  //terrain: z.string().optional(), // Keep for backward compatibility
   
   // Wildlife Information
   wildlifeInfo: z.array(wildlifeInfoSchema).optional(),
@@ -283,7 +283,7 @@ export const sanitizeAcreageBreakdown = (item: any): AcreageBreakdown => {
   return {
     acres: Number(item.acres) || 0,
     terrainType: String(item.terrainType || item.terrain_type || ""), // Handle both formats
-    description: String(item.description || ""),
+    //description: String(item.description || ""),
   };
 };
 
@@ -291,9 +291,9 @@ export const sanitizeAcreageBreakdown = (item: any): AcreageBreakdown => {
 export const sanitizeWildlifeInfo = (item: any): WildlifeInfo => {
   return {
     species: String(item.species || ""),
-    estimatedPopulation: Number(item.estimatedPopulation || item.estimated_population) || 0, // Handle both formats
-    populationDensity: (item.populationDensity || item.population_density || "moderate") as any, // Handle both formats
-    seasonInfo: String(item.seasonInfo || item.season_info || ""), // Handle both formats
+    //estimatedPopulation: Number(item.estimatedPopulation || item.estimated_population) || 0, // Handle both formats
+    populationDensity: Number(item.populationDensity || item.population_density) || 50, // Default to 50%
+    //seasonInfo: String(item.seasonInfo || item.season_info || ""), // Handle both formats
   };
 };
 
@@ -385,116 +385,54 @@ export const createNewAccommodation = (): AccommodationOption => ({
 export const createNewAcreageBreakdown = (): AcreageBreakdown => ({
   acres: 0,
   terrainType: "",
-  description: "",
+  //description: "",
 });
 
 // Helper function to create new wildlife info
 export const createNewWildlifeInfo = (): WildlifeInfo => ({
   species: "",
-  populationDensity: "moderate",
-  estimatedPopulation: 0,
-  seasonInfo: "",
+  populationDensity: 50,
+  //estimatedPopulation: 0,
+  //seasonInfo: "",
 });
 
 // Constants - Hunting Types
 export const huntingTypes = [
-  { id: "whitetail_deer", name: "Whitetail Deer" },
-  { id: "mule_deer", name: "Mule Deer" },
-  { id: "elk", name: "Elk" },
-  { id: "moose", name: "Moose" },
-  { id: "bear", name: "Bear" },
-  { id: "wild_boar", name: "Wild Boar" },
-  { id: "turkey", name: "Turkey" },
-  { id: "waterfowl", name: "Waterfowl" },
-  { id: "upland_birds", name: "Upland Birds" },
-  { id: "small_game", name: "Small Game" },
-  { id: "predator", name: "Predator/Varmint" },
-  { id: "exotic", name: "Exotic Game" },
+  { id: "stand_hunt", name: "Stand Hunt" },
+  { id: "stalk_hunt", name: "Stalk hunt" },
+  { id: "driven_hunt", name: "Driven Hunt (Drückjagd)" },
+  { id: "battue", name: "Battue (Treibjagd)" },
 ];
 
 // Terrain types for better selection
 export const terrainTypes = [
-  { id: "forest", name: "Forest/Wooded" },
-  { id: "prairie", name: "Prairie/Grassland" },
+  { id: "forest", name: "Forest/Woodland" },
+  { id: "field", name: "Field/Open country" },
   { id: "mountain", name: "Mountain/Hilly" },
-  { id: "wetland", name: "Wetland/Marsh" },
-  { id: "desert", name: "Desert" },
-  { id: "agricultural", name: "Agricultural/Farmland" },
-  { id: "mixed", name: "Mixed Terrain" },
-  { id: "river_bottom", name: "River Bottom" },
-  { id: "creek_bottom", name: "Creek Bottom" },
-  { id: "ridge", name: "Ridge/Plateau" },
-  { id: "valley", name: "Valley" },
-  { id: "brushland", name: "Brush/Scrubland" },
+  { id: "water", name: "Bodies of water" },
 ];
 
 // Species options for dropdown - sorted alphabetically
 export const wildlifeSpeciesList = [
-  // Big Game
-  { id: "whitetail_deer", name: "Whitetail Deer" },
-  { id: "mule_deer", name: "Mule Deer" },
-  { id: "elk", name: "Elk" },
-  { id: "moose", name: "Moose" },
-  { id: "black_bear", name: "Black Bear" },
-  { id: "brown_bear", name: "Brown Bear" },
-  { id: "wild_boar", name: "Wild Boar/Feral Hog" },
-  { id: "antelope", name: "Pronghorn Antelope" },
-  { id: "bighorn_sheep", name: "Bighorn Sheep" },
-  { id: "mountain_goat", name: "Mountain Goat" },
-  { id: "caribou", name: "Caribou" },
-  { id: "axis_deer", name: "Axis Deer" },
+  { id: "red_deer", name: "Red Deer" },
+  { id: "fallow_deer", name: "Fallow Deer" },
   { id: "sika_deer", name: "Sika Deer" },
-  
-  // Small Game
-  { id: "cottontail_rabbit", name: "Cottontail Rabbit" },
-  { id: "jackrabbit", name: "Jackrabbit" },
-  { id: "snowshoe_hare", name: "Snowshoe Hare" },
-  { id: "squirrel", name: "Squirrel" },
-  { id: "raccoon", name: "Raccoon" },
-  { id: "opossum", name: "Opossum" },
-  { id: "groundhog", name: "Groundhog/Woodchuck" },
-  { id: "prairie_dog", name: "Prairie Dog" },
-  
-  // Birds
-  { id: "wild_turkey", name: "Wild Turkey" },
-  { id: "ruffed_grouse", name: "Ruffed Grouse" },
-  { id: "sharp_tailed_grouse", name: "Sharp-tailed Grouse" },
-  { id: "sage_grouse", name: "Sage Grouse" },
-  { id: "pheasant", name: "Ring-necked Pheasant" },
-  { id: "quail", name: "Quail" },
-  { id: "chukar", name: "Chukar" },
-  { id: "partridge", name: "Partridge" },
-  { id: "dove", name: "Mourning Dove" },
-  { id: "pigeon", name: "Pigeon" },
-  
-  // Waterfowl
-  { id: "mallard", name: "Mallard Duck" },
-  { id: "wood_duck", name: "Wood Duck" },
-  { id: "teal", name: "Teal" },
-  { id: "pintail", name: "Northern Pintail" },
-  { id: "canvasback", name: "Canvasback" },
-  { id: "redhead", name: "Redhead Duck" },
-  { id: "canada_goose", name: "Canada Goose" },
-  { id: "snow_goose", name: "Snow Goose" },
-  { id: "specklebelly", name: "White-fronted Goose" },
-  
-  // Predator/Varmint
-  { id: "coyote", name: "Coyote" },
-  { id: "fox", name: "Fox" },
-  { id: "bobcat", name: "Bobcat" },
-  { id: "mountain_lion", name: "Mountain Lion" },
-  { id: "wolf", name: "Wolf" },
-  { id: "crow", name: "Crow" },
-].sort((a, b) => a.name.localeCompare(b.name));
+  { id: "roe_deer", name: "Roe Deer" },
+  { id: "ibex", name: "Ibex" },
+  { id: "chamois", name: "Chamois" },
+  { id: "wild_boar", name: "Wild Boar" },
+  { id: "mouflon", name: "Mouflon" },
+  { id: "other", name: "Other" },
+];
 
 // Population density options
-export const populationDensityOptions = [
-  { id: "abundant", name: "Abundant", description: "Very high numbers, excellent hunting" },
-  { id: "common", name: "Common", description: "Good numbers, consistent hunting" },
-  { id: "moderate", name: "Moderate", description: "Average numbers, fair hunting" },
-  { id: "limited", name: "Limited", description: "Lower numbers, challenging hunting" },
-  { id: "rare", name: "Rare", description: "Minimal numbers, difficult hunting" },
-];
+//export const populationDensityOptions = [
+//  { id: "abundant", name: "Abundant", description: "Very high numbers, excellent hunting" },
+//  { id: "common", name: "Common", description: "Good numbers, consistent hunting" },
+//  { id: "moderate", name: "Moderate", description: "Average numbers, fair hunting" },
+//  { id: "limited", name: "Limited", description: "Lower numbers, challenging hunting" },
+//  { id: "rare", name: "Rare", description: "Minimal numbers, difficult hunting" },
+//];
 
 // Package inclusions with better organization
 export const packageInclusions = [
@@ -618,16 +556,17 @@ export const transformFormDataForSubmission = (
     
     // Property Details
     total_acres: formData.totalAcres,
-    primary_terrain: formData.terrain || "",
+    //primary_terrain: formData.terrain || "",
     
     // Complex data structures - ensure proper structure
     acreage_breakdown: formData.acreageBreakdown || [],
+    
+    // FIXED: Remove the commented out fields from wildlife_info mapping
     wildlife_info: formData.wildlifeInfo?.map(info => ({
       species: info.species,
-      estimated_population: info.estimatedPopulation,
       population_density: info.populationDensity,
-      season_info: info.seasonInfo || ""
     })) || [],
+    
     hunting_packages: formData.huntingPackages.map(pkg => sanitizeHuntingPackage(pkg)),
     accommodations: formData.accommodations,
     facilities: formData.facilities || [],

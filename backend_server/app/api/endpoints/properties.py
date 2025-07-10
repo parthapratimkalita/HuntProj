@@ -114,7 +114,7 @@ async def create_property_draft(
             latitude=property_data.latitude,
             longitude=property_data.longitude,
             total_acres=property_data.total_acres,
-            primary_terrain=property_data.primary_terrain,
+            #primary_terrain=property_data.primary_terrain,
             acreage_breakdown=acreage_breakdown_dict,
             wildlife_info=wildlife_info_dict,
             property_images=property_images_dict,
@@ -299,7 +299,7 @@ async def create_property(
             latitude=property_data.latitude,
             longitude=property_data.longitude,
             total_acres=property_data.total_acres,
-            primary_terrain=property_data.primary_terrain,
+            #primary_terrain=property_data.primary_terrain,
             acreage_breakdown=acreage_breakdown_dict,
             wildlife_info=wildlife_info_dict,
             hunting_packages=hunting_packages_dict,
@@ -437,8 +437,8 @@ def read_properties(
             query = query.filter(Property.total_acres >= search.min_acres)
         if search.max_acres:
             query = query.filter(Property.total_acres <= search.max_acres)
-        if search.terrain:
-            query = query.filter(Property.primary_terrain == search.terrain)
+        #if search.terrain:
+        #    query = query.filter(Property.primary_terrain == search.terrain)
         if search.wildlife_species:
             query = query.filter(Property.wildlife_info.op('?')(search.wildlife_species))
         
@@ -537,7 +537,7 @@ def read_property(
         "latitude": property_obj.latitude,
         "longitude": property_obj.longitude,
         "total_acres": property_obj.total_acres,
-        "primary_terrain": property_obj.primary_terrain,
+        #"primary_terrain": property_obj.primary_terrain,
         "acreage_breakdown": property_obj.acreage_breakdown,
         "wildlife_info": property_obj.wildlife_info,
         "hunting_packages": property_obj.hunting_packages,

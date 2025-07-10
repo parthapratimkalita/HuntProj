@@ -111,7 +111,7 @@ export default function PropertyFormPhased({ property : initialProperty }: Prope
       latitude: property?.latitude?.toString() || "",
       longitude: property?.longitude?.toString() || "",
       totalAcres: property?.total_acres || 0,
-      terrain: property?.primary_terrain || "",
+      //terrain: property?.primary_terrain || "",
       acreageBreakdown: [],
       wildlifeInfo: [],
       huntingPackages: [],
@@ -152,7 +152,7 @@ export default function PropertyFormPhased({ property : initialProperty }: Prope
       form.setValue('latitude', property.latitude?.toString() || '');
       form.setValue('longitude', property.longitude?.toString() || '');
       form.setValue('totalAcres', property.total_acres);
-      form.setValue('terrain', property.primary_terrain || '');
+      //form.setValue('terrain', property.primary_terrain || '');
       form.setValue('rules', property.rules || '');
       form.setValue('safety', property.safety_info || '');
       form.setValue('licenses', property.license_requirements || '');
@@ -659,10 +659,10 @@ export default function PropertyFormPhased({ property : initialProperty }: Prope
           <Card>
             <CardHeader>
               <CardTitle>
-                {property ? "Edit Property" : "Add New Property"}
+                {property ? "Edit Property" : "Add New Hunting Ground"}
               </CardTitle>
               <CardDescription>
-                Create your property listing in two simple phases
+              Create a personal landing page to present your hunting ground to other hunters.
               </CardDescription>
             </CardHeader>
             

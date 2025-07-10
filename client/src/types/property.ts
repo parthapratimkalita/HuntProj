@@ -60,7 +60,7 @@ export interface Property {
   
   // Property details
   total_acres: number;
-  primary_terrain?: string;
+  //primary_terrain?: string;
   
   // Complex fields (JSONB in database)
   acreage_breakdown?: AcreageBreakdown[];

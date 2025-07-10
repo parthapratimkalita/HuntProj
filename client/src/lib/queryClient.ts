@@ -1,5 +1,6 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { supabase } from '@/lib/supabaseClient';
+import { apiUrl } from "@/lib/api";
 
 // Helper function to get current Supabase token
 async function getSupabaseToken(): Promise<string | null> {
@@ -30,7 +31,7 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
-// ✅ FIXED: Updated apiRequest function to handle FormData properly
+// ✅ FIXED: Added missing 'method' parameter to fetch call
 export async function apiRequest(
   method: string,
   url: string,
@@ -72,8 +73,9 @@ export async function apiRequest(
     body = undefined; // No body for GET requests
   }
 
-  const res = await fetch(url, {
-    method,
+  const fullUrl = apiUrl(url);
+  const res = await fetch(fullUrl, {
+    method, // ✅ CRITICAL FIX: Added missing method parameter!
     headers,
     body
   });
@@ -122,6 +124,8 @@ export const getQueryFn: <T>(options: {
       }
     }
 
+    finalUrl = apiUrl(finalUrl);
+
     console.log("Query Function DEBUG:", {
       url: finalUrl,
       hasToken: !!token,
@@ -129,6 +133,7 @@ export const getQueryFn: <T>(options: {
     });
 
     const res = await fetch(finalUrl, {
+      method: 'GET', // ✅ Explicitly set method for queries (always GET)
       headers,
     });
 

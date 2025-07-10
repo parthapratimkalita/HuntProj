@@ -29,6 +29,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Loader2, Upload, X, FileText, Image as ImageIcon } from "lucide-react";
+import { apiUrl } from "@/lib/api";
 
 // Form schema with required bio and documents
 const providerFormSchema = z.object({
@@ -206,7 +207,7 @@ export default function ProviderApplicationForm({ onSuccess }: ProviderApplicati
       
       console.log("Sending application data to backend:", applicationData);
       
-      const response = await fetch('/api/v1/users/apply-host', {
+      const response = await fetch(apiUrl('/api/v1/users/apply-host'), {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,

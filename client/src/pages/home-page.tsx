@@ -44,9 +44,9 @@ export default function HomePage() {
   // Apply filters to properties
   const filteredProperties = properties?.filter(property => {
     // Filter by category (property type) - updated for new schema
-    if (filters.category && property.primary_terrain !== filters.category) {
-      return false;
-    }
+    //if (filters.category && property.primary_terrain !== filters.category) {
+    //  return false;
+    //}
     
     // Filter by price range - updated to use hunting packages
     if (property.hunting_packages && Array.isArray(property.hunting_packages)) {
