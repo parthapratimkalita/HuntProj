@@ -35,7 +35,7 @@ class Property(Base):
     
     # Property Details (Phase 1 - Required)
     total_acres = Column(Integer, nullable=False)
-    #primary_terrain = Column(String, nullable=True)
+    # primary_terrain = Column(String, nullable=True)
     
     # Complex Fields (JSONB)
     acreage_breakdown = Column(JSONB, nullable=True, default=list)

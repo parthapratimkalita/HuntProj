@@ -82,7 +82,7 @@ class PropertyDraftCreate(BaseModel):
     
     # Property Details
     total_acres: int = Field(..., gt=0)
-    #primary_terrain: Optional[str] = None
+    # primary_terrain: Optional[str] = None
     
     # Optional for Phase 1 - Handle both naming conventions
     acreage_breakdown: Optional[List[AcreageBreakdown]] = []
@@ -114,7 +114,7 @@ class PropertyCreate(BaseModel):
     
     # Property Details
     total_acres: int = Field(..., gt=0)
-    #primary_terrain: Optional[str] = None
+    # primary_terrain: Optional[str] = None
     acreage_breakdown: Optional[List[AcreageBreakdown]] = []
     wildlife_info: Optional[List[WildlifeInfo]] = []
     
@@ -155,7 +155,7 @@ class PropertyUpdate(BaseModel):
     
     # Always editable
     total_acres: Optional[int] = None
-    #primary_terrain: Optional[str] = None
+    # primary_terrain: Optional[str] = None
     acreage_breakdown: Optional[List[AcreageBreakdown]] = None
     wildlife_info: Optional[List[WildlifeInfo]] = None
     hunting_packages: Optional[List[HuntingPackage]] = None
@@ -268,7 +268,7 @@ class PropertySimple(BaseModel):
     
     # Property Details
     total_acres: int
-    #primary_terrain: Optional[str]
+    # primary_terrain: Optional[str]
     acreage_breakdown: Optional[List[AcreageBreakdown]]
     wildlife_info: Optional[List[WildlifeInfo]]
     
@@ -314,5 +314,5 @@ class PropertySearch(BaseModel):
     state: Optional[str] = None
     min_acres: Optional[int] = None
     max_acres: Optional[int] = None
-    terrain: Optional[str] = None
+    # terrain: Optional[str] = None
     wildlife_species: Optional[str] = None
