@@ -5,7 +5,8 @@ from app.core.security import get_current_user, get_password_hash, get_supabase_
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.user import User as UserSchema, UserUpdate
-from app.models.host_application import HostApplication, ApplicationStatus
+from app.models.host_application import HostApplication
+from app.models.enums import ApplicationStatus
 from app.schemas.host_application import HostApplication as HostApplicationSchema, HostApplicationCreate, HostApplicationReview
 from sqlalchemy.sql import func
 import json
@@ -164,7 +165,7 @@ async def apply_for_host(
     # FAST CHECK: Use the new column instead of querying host_applications table
     if current_user.host_application_status:
         print(f"APPLY HOST DEBUG: User already has status: {current_user.host_application_status}")
-        if current_user.host_application_status == "pending":
+        if current_user.host_application_status == ApplicationStatus.PENDING:
             raise HTTPException(status_code=400, detail="You already have a pending application.")
         elif current_user.host_application_status == "approved":
             raise HTTPException(status_code=400, detail="You already have an approved application.")
@@ -186,7 +187,7 @@ async def apply_for_host(
         db.refresh(application)
         
         # UPDATE USER TABLE: Set the status and ID
-        current_user.host_application_status = "pending"
+        current_user.host_application_status = ApplicationStatus.PENDING
         db.commit()
         db.refresh(current_user)
         
@@ -242,7 +243,7 @@ async def review_host_application(
     # UPDATE USER TABLE: Set the new status
     user = db.query(User).filter(User.id == application.user_id).first()
     if user:
-        user.host_application_status = review.status.value  # Convert enum to string
+        user.host_application_status = review.status
         if review.status == ApplicationStatus.APPROVED:
             user.role = "provider"  # Promote to provider
         

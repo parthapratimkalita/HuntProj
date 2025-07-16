@@ -1,22 +1,24 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Response
 from sqlalchemy.orm import Session
 from typing import Any, List, Optional
 from app.core.security import get_current_user
 from app.db.session import get_db
 from app.models.user import User
-from app.models.property import Property, PropertyStatus
+from app.models.property import Property
+from app.models.enums import PropertyStatus
 from app.models.booking import Booking
 from app.models.review import Review
 from app.schemas.property import (
     Property as PropertySchema,
-    PropertySimple,
     PropertyCreate,
     PropertyUpdate,
     PropertySearch,
     PropertyDraftCreate,
+    PropertyListResponse,
 )
 from app.schemas.review import Review as ReviewSchema, ReviewCreate
 from app.core.supabase import supabase
+from app.core.cache import cached_query, invalidate_property_cache
 import json
 
 router = APIRouter()
@@ -66,7 +68,7 @@ def convert_pydantic_to_dict(obj):
         # It's a primitive type
         return obj
 
-@router.post("/draft", response_model=PropertySimple)
+@router.post("/draft", response_model=PropertySchema)
 async def create_property_draft(
     property_data: PropertyDraftCreate,
     db: Session = Depends(get_db),
@@ -124,7 +126,7 @@ async def create_property_draft(
             accommodations=[],
             facilities=[],
             # Set as draft
-            status=PropertyStatus.DRAFT.value,
+            status=PropertyStatus.DRAFT,
             draft_completed_phase=1,
             is_listed=False  # Drafts are never listed
         )
@@ -132,6 +134,9 @@ async def create_property_draft(
         db.add(property_obj)
         db.commit()
         db.refresh(property_obj)
+        
+        # Invalidate property cache
+        invalidate_property_cache(property_obj.id)
         
         print(f"CREATE DRAFT: SUCCESS - Draft created with ID: {property_obj.id}")
         print("=" * 60)
@@ -167,7 +172,7 @@ async def complete_property_draft(
     if property_obj.provider_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized to edit this property")
     
-    if property_obj.status != PropertyStatus.DRAFT.value:
+    if property_obj.status != PropertyStatus.DRAFT:
         raise HTTPException(
             status_code=400, 
             detail=f"Property is not a draft. Current status: {property_obj.status}"
@@ -200,11 +205,14 @@ async def complete_property_draft(
             setattr(property_obj, field, value)
         
         # Update status and phase
-        property_obj.status = PropertyStatus.PENDING.value
+        property_obj.status = PropertyStatus.PENDING
         property_obj.draft_completed_phase = 2
         
         db.commit()
         db.refresh(property_obj)
+        
+        # Invalidate property cache
+        invalidate_property_cache(property_obj.id)
         
         return property_obj
         
@@ -235,7 +243,7 @@ async def toggle_property_listing(
     if property_obj.provider_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized to modify this property")
     
-    if property_obj.status != PropertyStatus.APPROVED.value:
+    if property_obj.status != PropertyStatus.APPROVED:
         raise HTTPException(
             status_code=400, 
             detail=f"Only approved properties can be listed/delisted. Current status: {property_obj.status}"
@@ -245,6 +253,9 @@ async def toggle_property_listing(
     property_obj.is_listed = not property_obj.is_listed
     db.commit()
     db.refresh(property_obj)
+    
+    # Invalidate property cache
+    invalidate_property_cache(property_obj.id)
     
     return property_obj
 
@@ -311,7 +322,7 @@ async def create_property(
             season_info=property_data.season_info,
             property_images=property_images_dict,
             profile_image_index=property_data.profile_image_index,
-            status=PropertyStatus.PENDING.value,
+            status=PropertyStatus.PENDING,
             draft_completed_phase=2,  # Full completion
             is_listed=False  # Will be listed after approval
         )
@@ -319,6 +330,9 @@ async def create_property(
         db.add(property_obj)
         db.commit()
         db.refresh(property_obj)
+        
+        # Invalidate property cache
+        invalidate_property_cache(property_obj.id)
         
         print(f"CREATE PROPERTY: SUCCESS - Property created with ID: {property_obj.id}")
         print("=" * 60)
@@ -351,7 +365,7 @@ def list_pending_properties(
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Not enough permissions")
     
-    return db.query(Property).filter(Property.status == PropertyStatus.PENDING.value).all()
+    return db.query(Property).filter(Property.status == PropertyStatus.PENDING).all()
 
 @router.post("/{property_id}/approve", response_model=PropertySchema)
 def approve_property(
@@ -370,13 +384,17 @@ def approve_property(
     if not property_obj:
         raise HTTPException(status_code=404, detail="Property not found")
     
-    property_obj.status = PropertyStatus.APPROVED.value
+    property_obj.status = PropertyStatus.APPROVED
     property_obj.is_listed = True  # Automatically list when approved
     if admin_feedback:
         property_obj.admin_feedback = admin_feedback
     
     db.commit()
     db.refresh(property_obj)
+    
+    # Invalidate property cache
+    invalidate_property_cache(property_obj.id)
+    
     return property_obj
 
 @router.post("/{property_id}/reject", response_model=PropertySchema)
@@ -396,60 +414,132 @@ def reject_property(
     if not property_obj:
         raise HTTPException(status_code=404, detail="Property not found")
     
-    property_obj.status = PropertyStatus.REJECTED.value
+    property_obj.status = PropertyStatus.REJECTED
     property_obj.is_listed = False  # Ensure rejected properties are not listed
     property_obj.admin_feedback = admin_feedback
     
     db.commit()
     db.refresh(property_obj)
+    
+    # Invalidate property cache
+    invalidate_property_cache(property_obj.id)
+    
     return property_obj
 
-@router.get("/", response_model=List[PropertySchema])
-def read_properties(
-    *,
-    db: Session = Depends(get_db),
+@cached_query(ttl=300, cache_key_prefix="properties")
+def _get_properties_cached(
+    db: Session,
     skip: int = 0,
-    limit: int = 100,
-    search: PropertySearch = None,
+    limit: int = 20,
+    search_params: dict = None,
     approved_only: bool = True,
-    listed_only: bool = True,  # New parameter
-) -> Any:
+    listed_only: bool = True,
+    sort_by: str = "created_at",
+    sort_order: str = "desc",
+) -> tuple:
     """
-    Retrieve properties with enhanced search filters
-    By default, only shows approved and listed properties
+    Cached function to retrieve properties with pagination and search filters
+    Returns tuple of (properties, total_count)
     """
-    query = db.query(Property)
+    from sqlalchemy.orm import joinedload
+    
+    query = db.query(Property).options(
+        joinedload(Property.provider)  # Include provider information
+    )
     
     # Filter by approval status if requested
     if approved_only:
-        print(f"DEBUG: Filtering by status = {PropertyStatus.APPROVED.value}")
-        query = query.filter(Property.status == PropertyStatus.APPROVED.value)
+        print(f"DEBUG: Filtering by status = {PropertyStatus.APPROVED}")
+        query = query.filter(Property.status == PropertyStatus.APPROVED)
     
     # Filter by listing status if requested
     if listed_only:
         query = query.filter(Property.is_listed == True)
     
-    if search:
+    if search_params:
         # New search filters
-        if search.hunting_type:
-            query = query.filter(Property.hunting_packages.op('?')(search.hunting_type))
-        if search.min_acres:
-            query = query.filter(Property.total_acres >= search.min_acres)
-        if search.max_acres:
-            query = query.filter(Property.total_acres <= search.max_acres)
-        #if search.terrain:
-        #    query = query.filter(Property.primary_terrain == search.terrain)
-        if search.wildlife_species:
-            query = query.filter(Property.wildlife_info.op('?')(search.wildlife_species))
+        if search_params.get('hunting_type'):
+            query = query.filter(Property.hunting_packages.op('?')(search_params['hunting_type']))
+        if search_params.get('min_acres'):
+            query = query.filter(Property.total_acres >= search_params['min_acres'])
+        if search_params.get('max_acres'):
+            query = query.filter(Property.total_acres <= search_params['max_acres'])
+        if search_params.get('wildlife_species'):
+            query = query.filter(Property.wildlife_info.op('?')(search_params['wildlife_species']))
         
         # Location search filters
-        if search.city:
-            query = query.filter(Property.city.ilike(f"%{search.city}%"))
-        if search.state:
-            query = query.filter(Property.state.ilike(f"%{search.state}%"))
+        if search_params.get('city'):
+            query = query.filter(Property.city.ilike(f"%{search_params['city']}%"))
+        if search_params.get('state'):
+            query = query.filter(Property.state.ilike(f"%{search_params['state']}%"))
     
+    # Count total before pagination
+    total = query.count()
+    
+    # Apply sorting
+    if hasattr(Property, sort_by):
+        order_column = getattr(Property, sort_by)
+        if sort_order.lower() == "desc":
+            query = query.order_by(order_column.desc())
+        else:
+            query = query.order_by(order_column.asc())
+    
+    # Apply pagination
     properties = query.offset(skip).limit(limit).all()
-    return properties
+    
+    return properties, total
+
+@router.get("/", response_model=PropertyListResponse)
+def read_properties(
+    *,
+    response: Response,
+    db: Session = Depends(get_db),
+    skip: int = 0,
+    limit: int = 20,
+    search: PropertySearch = None,
+    approved_only: bool = True,
+    listed_only: bool = True,  # New parameter
+    sort_by: str = "created_at",
+    sort_order: str = "desc",
+) -> Any:
+    """
+    Retrieve properties with pagination and enhanced search filters
+    By default, only shows approved and listed properties
+    """
+    # Convert search object to dict for caching
+    search_params = None
+    if search:
+        search_params = {
+            'hunting_type': search.hunting_type,
+            'min_acres': search.min_acres,
+            'max_acres': search.max_acres,
+            'wildlife_species': search.wildlife_species,
+            'city': search.city,
+            'state': search.state,
+        }
+    
+    # Use cached function
+    properties, total = _get_properties_cached(
+        db=db,
+        skip=skip,
+        limit=limit,
+        search_params=search_params,
+        approved_only=approved_only,
+        listed_only=listed_only,
+        sort_by=sort_by,
+        sort_order=sort_order
+    )
+    
+    # Set caching headers
+    response.headers["Cache-Control"] = "public, max-age=300"  # 5 minutes
+    response.headers["ETag"] = f"properties-{hash(str(properties))}"
+    
+    return PropertyListResponse(
+        items=properties,
+        total=total,
+        skip=skip,
+        limit=limit
+    )
 
 @router.get("/my-properties", response_model=List[PropertySchema])
 def get_my_properties(
@@ -472,7 +562,7 @@ def get_my_properties(
     
     # Filter by status if specified
     if status:
-        if status.upper() in [s.value for s in PropertyStatus]:
+        if status.upper() in [s for s in PropertyStatus]:
             query = query.filter(Property.status == status.upper())
         else:
             raise HTTPException(
@@ -481,7 +571,7 @@ def get_my_properties(
             )
     elif not include_drafts:
         # Exclude drafts if not explicitly included
-        query = query.filter(Property.status != PropertyStatus.DRAFT.value)
+        query = query.filter(Property.status != PropertyStatus.DRAFT)
     
     return query.all()
 
@@ -514,7 +604,7 @@ def read_property(
     if current_user and property_obj.provider_id == current_user.id:
         # Provider can view their own property in any status
         pass
-    elif property_obj.status == PropertyStatus.APPROVED.value and property_obj.is_listed:
+    elif property_obj.status == PropertyStatus.APPROVED and property_obj.is_listed:
         # Public can view approved and listed properties
         pass
     else:
@@ -595,7 +685,7 @@ def update_property(
     update_data = property_in.dict(exclude_unset=True)
     
     # If property is approved, prevent changes to locked fields
-    if property_obj.status == PropertyStatus.APPROVED.value and current_user.role != "admin":
+    if property_obj.status == PropertyStatus.APPROVED and current_user.role != "admin":
         locked_fields = ['property_name', 'address', 'city', 'state', 'zip_code', 'latitude', 'longitude']
         for field in locked_fields:
             if field in update_data:
@@ -612,21 +702,25 @@ def update_property(
         setattr(property_obj, field, value)
     
     # Handle status changes based on property state
-    if property_obj.status == PropertyStatus.DRAFT.value:
+    if property_obj.status == PropertyStatus.DRAFT:
         # If it's still a draft and has all required fields, allow completion
         if (property_obj.hunting_packages and len(property_obj.hunting_packages) > 0 and
             property_obj.accommodations and len(property_obj.accommodations) > 0):
-            property_obj.status = PropertyStatus.PENDING.value
+            property_obj.status = PropertyStatus.PENDING
             property_obj.draft_completed_phase = 2
-    elif property_obj.status == PropertyStatus.REJECTED.value:
+    elif property_obj.status == PropertyStatus.REJECTED:
         # Only reset to pending if significant changes were made
         if any(field in update_data for field in ['hunting_packages', 'accommodations', 'total_acres', 'wildlife_info']):
-            property_obj.status = PropertyStatus.PENDING.value
+            property_obj.status = PropertyStatus.PENDING
     # If APPROVED, status remains APPROVED regardless of changes
     
     db.add(property_obj)
     db.commit()
     db.refresh(property_obj)
+    
+    # Invalidate property cache
+    invalidate_property_cache(property_obj.id)
+    
     return property_obj
 
 @router.delete("/{property_id}")
@@ -673,6 +767,10 @@ def delete_property(
     
     db.delete(property_obj)
     db.commit()
+    
+    # Invalidate property cache
+    invalidate_property_cache(property_id)
+    
     return {"message": "Property deleted successfully"}
 
 @router.post("/{property_id}/reviews/", response_model=ReviewSchema)
